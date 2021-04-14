@@ -1,0 +1,92 @@
+---
+title: "20210419_analysis"
+author: "Fabien Kon-Sun-Tack"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    fig_caption: yes
+    toc: yes
+    toc_float: true
+    toc_depth: 5
+---
+
+## Objectifs de la semaine
+
+prise en main des données, stat descriptives
+
+## Prise en main de git/github
+
+Cloner le dossier epinova
+
+Suivre la demo ici : https://privefl.github.io/R-presentation/rstudio-git.html#1
+
+Autre lien utile: https://r-pkgs.org/git.html
+
+Faire un test:
+
+- git pull
+- git commit
+- git push
+
+## Prise en main Rmarkdown
+
+Lire la présentation ici: https://privefl.github.io/R-presentation/rmarkdown.html#1
+
+Faire un test : 
+
+- copier le fichier 20210419_analysis.Rmd
+- générer un html à l'aide de la commande `knit` dans RStudio
+- faire des modifications (ajout d'un chunk R par exemple)
+- générer un html à l'aide de la commande `knit` dans RStudio
+
+## Téléchargement des données
+
+Nature des données:
+
+- condition A: HCT116 double KO DNMT1-DNMMT3
+- condition A: HCT116 simple KO DNMT1
+- condition C: HCT116 WT serum
+- condition D: HCT116 WT serum déprivation 24h 
+
+Télécharger les données ici: XXX
+
+Copier les données dans le dossier data. **Attention**, ne jamais mettre les données sur github (trop volumineux).
+
+Dans tous les documents d'analyses, chercher les données à l'aide d'un chemin relatif du type `data = readRDS("../../data/mydata.rds")`.
+
+## Analyse des données
+
+### Statistiques descriptives
+
+Combien de conditions? Combien de réplicats? Combien de variables?
+
+Visualisation (`density`, `hist`)
+
+### Test statistiques et analyse différentielle
+
+Test univarié des moyennes entre conditions A-C, B-C et C-D.
+
+Test univarié des variances entre conditions A-C, B-C et C-D.
+
+http://www.sthda.com/french/wiki/test-f-comparaison-de-deux-variances-avec-r
+
+Correction des p-valeurs par Benjamini-hochberg
+
+Visualisation par:  
+
+- volcanoplot
+- manhattan plot
+
+### Integration des résultats
+
+Combien de sondes varient (moyenne) dans toutes les combinaisons A-C, B-C et C-D? 
+
+Est-ce que le sens de variation est toujours le même?
+
+Combien de sondes varient à la fois en moyenne ET en variance dans chaque combinaison?
+
+Combien de sondes ont une variance différente pour une même moyenne dans chaque combinaison?
+
+## Bilan et conclusion
+
+
