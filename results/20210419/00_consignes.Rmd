@@ -48,11 +48,14 @@ Nature des données:
 - condition C: HCT116 WT serum
 - condition D: HCT116 WT serum déprivation 24h 
 
-Télécharger les données ici: http://epimed.univ-grenoble-alpes.fr/downloads/florent/hadaca/
+Télécharger l’étude au format `epimedtools` depuis cette URL : http://epimed.univ-grenoble-alpes.fr/downloads/florent/hadaca/results/study_hadaca_epic.rds
 
 Copier les données dans le dossier data. **Attention**, ne jamais mettre les données sur github (trop volumineux).
 
 Dans tous les documents d'analyses, chercher les données à l'aide d'un chemin relatif du type `data = readRDS("../../data/mydata.rds")`.
+
+S’inspirer du code suivant popur réaliser les analyses demnadées.
+
 
 ## Analyse des données
 

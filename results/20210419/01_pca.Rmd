@@ -1,0 +1,206 @@
+---
+title: "Epic data from Hadaca"
+subtitle: "PCA"
+author: "Florent Chuffart"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+
+# Design 
+
+  - Epic from hadaca
+    - A1 DbKO_rep1       
+    - A2 DbKO_rep2       
+    - A3 DbKO_rep3       
+    - A4 DbKO_rep4       
+    - A5 DbKO_rep5       
+    - A6 DbKO_rep6       
+    - A7 DbKO_rep7       
+    - A8 DbKO_rep8       
+    - B1 D1KO_rep1 
+    - B2 D1KO_rep2       
+    - B3 D1KO_rep3       
+    - B4 D1KO_rep4       
+    - B5 D1KO_rep5 
+    - B6 D1KO_rep6       
+    - B7 D1KO_rep7       
+    - B8 D1KO_rep8       
+    - C1 WTws_rep1       
+    - C2 WTws_rep2 
+    - C3 WTws_rep3       
+    - C4 WTws_rep4       
+    - C5 WTws_rep5       
+    - C6 WTws_rep6 
+    - C7 WTws_rep7       
+    - C8 WTws_rep8       
+    - D1 WTwo_rep1       
+    - D2 WTwo_rep2       
+    - D3 WTwo_rep3 
+    - D4 WTwo_rep4 
+    - D5 WTwo_rep5       
+    - D6 WTwo_rep6       
+    - D7 WTwo_rep7 
+    - D8 WTwo_rep8 
+
+
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+```
+
+```{r label="loading data"}
+if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
+s = mreadRDS("../../data/study_hadaca_epic.rds")
+```
+
+
+# PCA
+
+```{r fig.width=9, fig.height=9, eval=TRUE, label="PCA"}
+if (!exists("pca")) {
+  data = s$data
+  dim(data)
+  # filtering...
+  idx = apply(is.na(data), 1, any)
+  sum(idx)
+  data = data[!idx,]
+  idx = apply(data, 1, function (l){
+    length(unique(l)) == 1
+  })
+  sum(idx)
+  data = data[!idx,]
+  dim(data)
+  set.seed(1)
+  pca = prcomp(t(data[sample(1:nrow(data), 1000),]), scale=TRUE)  
+}
+  
+v = pca$sdev * pca$sdev
+p = v / sum(v) * 100
+layout(matrix(1:4,2, byrow=FALSE), respect=TRUE)
+barplot(p)
+i=3
+j=2
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+i=1
+j=3
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+i=1
+j=2
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+```
+
+
+# filtering data
+
+```{r label="density", eval=FALSE}
+data = s$data
+head(data)
+if (!exists("cl")) {
+  cl = parallel::makeForkCluster(nnodes=32)
+  # filtering...
+  idx = apply(is.na(data), 1, any)
+  sum(idx)
+  data = data[!idx,]
+  idx = apply(data, 1, function (l){
+    length(unique(l)) == 1
+  })
+  sum(idx)
+  data = data[!idx,]
+}
+head(data)
+dim(data)
+plot(density(data))
+plot(density(parallel::parApply(cl, data, 1, sd)))
+
+
+
+```
+
+# lm
+
+```{r label="lm", eval=FALSE}
+
+# data = s$data
+head(data)
+head(data[,17:32])
+data = data[,17:32]
+print(s$exp_grp[colnames(data),]) 
+
+if (!exists("lm_res")) {
+  # data
+  lm_res = parallel::parApply(cl, data, 1, function(l) {
+  # lm_res = epimedtools::monitored_apply(data, 1, function(l) {
+    # l = data[1,]
+    m = lm(l~ s$exp_grp[colnames(data),]$cond)
+    res = c(m$coefficients[1], m$coefficients[2:4] + m$coefficients[1], anova(m)[1,5])
+    names(res) = c(substr(levels(s$exp_grp$cond), 1, 4), "pval")
+    res
+    return(res)
+  })
+  lm_res = t(lm_res)
+}
+
+pca = prcomp(lm_res[,1:4], scale=TRUE)
+
+v = pca$sdev * pca$sdev
+p = v / sum(v) * 100
+p
+pch="."
+col=1
+layout(matrix(1:4,2, byrow=FALSE), respect=TRUE)
+barplot(p)
+i=3
+j=2
+#plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), 
+#  col=1, pch=pch)
+smoothScatter(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), 
+  col=1, pch=pch)
+# text(pca$x[,i], pca$x[,j], rownames(pca$x))
+i=1
+j=3
+#plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), 
+#  col=1, pch=pch)
+smoothScatter(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), 
+  col=1, pch=pch)
+# text(pca$x[,i], pca$x[,j], rownames(pca$x))
+i=1
+j=2
+#plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), 
+#  col=1, pch=pch)
+smoothScatter(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), 
+  col=1, pch=pch)
+# text(pca$x[,i], pca$x[,j], rownames(pca$x))
+
+
+layout(1)
+plot(density(-log10(lm_res[,5])))
+plot(-log10(lm_res[,5]), pch=".")
+
+```
+
+```{r results="verbatim", eval=FALSE}
+for (n in  names(sort(lm_res[,5])[1:20])) {
+  l = data[n,]
+  m = lm(l~ s$exp_grp$cond)
+  print(m)
+  boxplot(l~ s$exp_grp$cond)
+}
+```
+
+
+
+# Session Information
+
+```{r results="verbatim"}
+sessionInfo()
+```
+
