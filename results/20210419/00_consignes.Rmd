@@ -1,5 +1,5 @@
 ---
-title: "20210419_analysis"
+title: "00_consignes"
 author: "Fabien Kon-Sun-Tack"
 date: "`r Sys.Date()`"
 output:
@@ -43,42 +43,77 @@ Faire un test :
 
 Nature des données:
 
-- condition A: HCT116 double KO DNMT1-DNMMT3
-- condition A: HCT116 simple KO DNMT1
-- condition C: HCT116 WT serum
-- condition D: HCT116 WT serum déprivation 24h 
+- condition A: HCT116 double KO DNMT1-DNMMT3 : `DbKO`
+- condition A: HCT116 simple KO DNMT1 : `D1KO`
+- condition C: HCT116 WT serum : `WTws`
+- condition D: HCT116 WT serum déprivation 24h : `WTwo`
 
 Télécharger l’étude au format `epimedtools` depuis cette URL : http://epimed.univ-grenoble-alpes.fr/downloads/florent/hadaca/results/study_hadaca_epic.rds
 
 Copier les données dans le dossier data. **Attention**, ne jamais mettre les données sur github (trop volumineux).
 
-Dans tous les documents d'analyses, chercher les données à l'aide d'un chemin relatif du type `data = readRDS("../../data/mydata.rds")`.
+Dans tous les documents d'analyses, chercher les données à l'aide d'un chemin relatif du type `data = readRDS("../../data/study_hadaca_epic.rds")`.
 
-S’inspirer du code suivant popur réaliser les analyses demnadées.
+S’inspirer du code suivant pour réaliser les analyses demandées.
 
 
 ## Analyse des données
 
 ### Statistiques descriptives
 
-Combien de conditions? Combien de réplicats? Combien de variables?
+Charger les données :
 
-Visualisation (`density`, `hist`)
+```{r label="loading data"}
+if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
+s = mreadRDS("../../data/study_hadaca_epic.rds")
+```
+
+Les informations sur le design experimental se trouvent dans la dataframe `s$exp_grp`
+
+```{r , echo=TRUE, results="verbatim"}
+table(substr(s$exp_grp$cond, 1, 4))
+```
+
+
+Les données se trouvent dans la dataframe `s$data`: 865918 sondes de méthylation pour 32 échantillons (4 conditions x 8 réplicats).
+
+```{r , echo=TRUE, results="verbatim"}
+dim(s$data)
+head(s$data)
+```
+
+Les informations sur les sondes (locatisation, chromosome, feature, gène associé...) se trouvent dans la dataframe `s$platform`.
+
+```{r , echo=TRUE, results="verbatim"}
+dim(s$platform)
+colnames(s$platform)
+head(s$platform)
+```
+
+*Consignes*:
+
+- Prendre en main les données
+- Combien de conditions? Combien de réplicats? Combien de variables?
+- Visualisation les données (par condition), par exemple à l'aide des fonctions suivantes : `density`, `hist`, ACP (voir 01_pca.Rmd) ou autres...
 
 ### Test statistiques et analyse différentielle
 
-Test univarié des moyennes entre conditions A-C, B-C et C-D.
+*Consignes*:
 
-Test univarié des variances entre conditions A-C, B-C et C-D.
+[1] Réaliser des test univariés (pour chaque sonde) sur les moyennes entre conditions A-C, B-C et C-D. 
 
-http://www.sthda.com/french/wiki/test-f-comparaison-de-deux-variances-avec-r
+Par exemple à l'aide de: http://www.sthda.com/french/wiki/test-de-student-avec-r
 
-Correction des p-valeurs par Benjamini-hochberg
+[2] Réaliser des test univariés (pour chaque sonde) des variances entre conditions A-C, B-C et C-D.
 
-Visualisation par:  
+Par exemple à l'aide de: http://www.sthda.com/french/wiki/test-f-comparaison-de-deux-variances-avec-r
 
-- volcanoplot
-- manhattan plot
+[3] Corriger les p-valeurs par Benjamini-hochberg
+
+[4] Visualisation par:  
+
+- volcano plot
+- manhattan plot (en utilisant les coordonnées des sondes)
 
 ### Integration des résultats
 
@@ -90,6 +125,6 @@ Combien de sondes varient à la fois en moyenne ET en variance dans chaque combi
 
 Combien de sondes ont une variance différente pour une même moyenne dans chaque combinaison?
 
-## Bilan et conclusion
+## Interprétation et conclusion
 
-
+A rédiger
