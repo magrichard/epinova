@@ -48,7 +48,7 @@ Nature des données:
 - condition C: HCT116 WT serum
 - condition D: HCT116 WT serum déprivation 24h 
 
-Télécharger les données ici: XXX
+Télécharger les données ici: http://epimed.univ-grenoble-alpes.fr/downloads/florent/hadaca/
 
 Copier les données dans le dossier data. **Attention**, ne jamais mettre les données sur github (trop volumineux).
 
