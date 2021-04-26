@@ -17,10 +17,7 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 ```{r label="loading data"}
 library(tibble)
 library(dplyr)
-<<<<<<< HEAD
 library(ggplot2)
-=======
->>>>>>> 2c9182e9240c7df3025bc8422ed955dfcb9a4931
 if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
 s = mreadRDS("../../data/study_hadaca_epic.rds")
 data <- s$data
@@ -32,11 +29,7 @@ tmp <- tmp[complete.cases(tmp), ]
 
 ```{r exp_grp, echo=TRUE, results="verbatim"}
 table(substr(s$exp_grp$cond, 1, 4))
-<<<<<<< HEAD
 print("4 conditions, 8 réplicats par condition")
-=======
-
->>>>>>> 2c9182e9240c7df3025bc8422ed955dfcb9a4931
 ```
 
 ## Data
@@ -155,14 +148,7 @@ print(cbind(head(tmp$VfdrAC),head(tmp$VfdrBC),head(tmp$VfdrCD)))
 
 # Specific Plots
 ## Volcano Plot
-<<<<<<< HEAD
-```{r echo=T,eval=T,results="hold",label="Preparing data for volcano plots"}
-=======
 ```{r echo=T,eval=T,results="hold",label="Volcano plotting data"}
-tmp$TAC <- apply(tmp,1,function(x) t.test(x[1:8],x[17:24])$p.value)
-tmp$TBC <- apply(tmp,1,function(x) t.test(x[9:16],x[17:24])$p.value)
-tmp$TCD <- apply(tmp,1,function(x) t.test(x[17:24],x[25:32])$p.value)
->>>>>>> 2c9182e9240c7df3025bc8422ed955dfcb9a4931
 tmp$Amean <- rowMeans(tmp[,1:8])
 tmp$Bmean <- rowMeans(tmp[,9:16])
 tmp$Cmean <- rowMeans(tmp[,17:24])
@@ -171,32 +157,25 @@ tmp$logAC <- log2(tmp$Cmean / tmp$Amean)
 tmp$logBC <- log2(tmp$Cmean / tmp$Bmean)
 tmp$logCD <- log2(tmp$Dmean / tmp$Cmean)
 results <- data.frame(cbind(tmp$logAC,tmp$logBC,tmp$logCD,tmp$Amean,tmp$Bmean,tmp$Cmean,tmp$Dmean))
-<<<<<<< HEAD
 ```
 ```{r echo=T,eval=T,results="hold",label="Volcano plotting data: A versus C"}
 volcanoAC <- ggplot(results,aes(x=tmp$logAC,y=-log10(tmp$TAC)))
 volcanoAC + geom_point()
 ```
 ```{r echo=T,eval=T,results="hold",label="Volcano plotting data: B versus C"}
-=======
 volcanoAC <- ggplot(results,aes(x=tmp$logAC,y=tmp$TAC))
 volcanoAC + geom_point()
 ```
-```{r echo=T,eval=T,results="hold",label="Volcano plotting data"}
+```{r echo=T,eval=T,results="hold"}
 volcanoAC <- ggplot(results,aes(x=tmp$logAC,y=-log10(tmp$TAC)))
 volcanoAC + geom_point()
 ```
-```{r echo=T,eval=T,results="hold",label="Volcano plotting data"}
->>>>>>> 2c9182e9240c7df3025bc8422ed955dfcb9a4931
+```{r echo=T,eval=T,results="hold"}
 volcanoBC <- ggplot(results,aes(x=tmp$logBC,y=-log10(tmp$TBC)))
 volcanoBC + geom_point()
 ```
 
-<<<<<<< HEAD
-```{r echo=T,eval=T,results="hold",label="Volcano plotting data: C versus D"}
-=======
-```{r echo=T,eval=T,results="hold",label="Volcano plotting data"}
->>>>>>> 2c9182e9240c7df3025bc8422ed955dfcb9a4931
+```{r echo=T,eval=T,results="hold"}
 volcanoCD <- ggplot(results,aes(x=tmp$logCD,y=-log10(tmp$TCD)))
 volcanoCD + geom_point()
 ```
