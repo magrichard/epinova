@@ -1,0 +1,202 @@
+---
+title: "Premiers essais sur le jeu de données"
+author: "Fabien KON-SUN-TACK"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+```
+
+```{r label="loading data"}
+library(tibble)
+library(dplyr)
+<<<<<<< HEAD
+library(ggplot2)
+=======
+>>>>>>> 2c9182e9240c7df3025bc8422ed955dfcb9a4931
+if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
+s = mreadRDS("../../data/study_hadaca_epic.rds")
+data <- s$data
+tmp <- data.frame(data)
+tmp <- tmp[complete.cases(tmp), ]
+```
+
+# Design 
+
+```{r exp_grp, echo=TRUE, results="verbatim"}
+table(substr(s$exp_grp$cond, 1, 4))
+<<<<<<< HEAD
+print("4 conditions, 8 réplicats par condition")
+=======
+
+>>>>>>> 2c9182e9240c7df3025bc8422ed955dfcb9a4931
+```
+
+## Data
+```{r echo=TRUE, results="verbatim", label = "Data Description"}
+head(s$data)
+
+colnames(s$platform)
+
+head(s$platform)
+A <- tmp[,1:8]
+print(head(A))
+B <- tmp[,9:16]
+print(head(B))
+C <- tmp[,17:24]
+print(head(C))
+D <- tmp[,25:32]
+print(head(D))
+```
+
+## Graphs
+```{r echo=TRUE, fig.width=9, fig.height=9, eval=TRUE, label="Plotting Data"}
+hist(data[,1:8], main="Condition A: HCT116 double KO DNMT1-DNMT3")
+hist(data[,9:16], main="Condition B: HCT116 simple KO DNMT1")
+hist(data[,17:24], main="Condition C: HCT116 WT serum")
+hist(data[,25:32], main="Condition D: HCT116 WT serum deprivation 24h")
+```
+
+
+# PCA
+
+```{r fig.width=9, fig.height=9, eval=TRUE, label="PCA"}
+if (!exists("pca")) {
+  data = s$data
+  dim(data)
+  # filtering...
+  idx = apply(is.na(data), 1, any)
+  sum(idx)
+  data = data[!idx,]
+  idx = apply(data, 1, function (l){
+    length(unique(l)) == 1
+  })
+  sum(idx)
+  data = data[!idx,]
+  dim(data)
+  set.seed(1)
+  pca = prcomp(t(data[sample(1:nrow(data), 1000),]), scale=TRUE)  
+}
+  
+v = pca$sdev * pca$sdev
+p = v / sum(v) * 100
+layout(matrix(1:4,2, byrow=FALSE), respect=TRUE)
+barplot(p)
+i=3
+j=2
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+i=1
+j=3
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+i=1
+j=2
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+```
+
+# Univariate Analysis
+
+## Student tests
+
+```{r echo=TRUE, eval=TRUE, results="verbatim", label="Student univariate tests"}
+tmp <- tmp %>% add_column(TAC = 0)
+tmp <- tmp %>% add_column(TBC = 0)
+tmp <- tmp %>% add_column(TCD = 0)
+tmp$TAC <- apply(tmp,1,function(x) t.test(x[1:8],x[17:24])$p.value)
+tmp$TBC <- apply(tmp,1,function(x) t.test(x[9:16],x[17:24])$p.value)
+tmp$TCD <- apply(tmp,1,function(x) t.test(x[17:24],x[25:32])$p.value)
+print(cbind(head(tmp$TAC),head(tmp$TBC),head(tmp$TCD)))
+
+```
+
+
+## Fisher tests
+```{r echo=TRUE, eval=TRUE, results="verbatim", label="Fisher univariate tests"}
+tmp <- tmp %>% add_column(VAC = 0)
+tmp <- tmp %>% add_column(VBC = 0)
+tmp <- tmp %>% add_column(VCD = 0)
+tmp$VAC <- apply(tmp,1,function(x) var.test(x[1:8],x[17:24])$p.value)
+tmp$VBC <- apply(tmp,1,function(x) var.test(x[9:16],x[17:24])$p.value)
+tmp$VCD <- apply(tmp,1,function(x) var.test(x[17:24],x[25:32])$p.value)
+print(cbind(head(tmp$VAC),head(tmp$VBC),head(tmp$VCD)))
+```
+
+# P-value Correction
+## Student tests
+```{r echo=TRUE, eval=TRUE, results="verbatim", label="Benjamini-Hochberg P-value correction: Student tests"}
+tmp <- tmp %>% add_column(TfdrAC = 0)
+tmp <- tmp %>% add_column(TfdrBC = 0)
+tmp <- tmp %>% add_column(TfdrCD = 0)
+tmp$TfdrAC <- p.adjust(tmp$TAC,method="BH")
+tmp$TfdrBC <- p.adjust(tmp$TBC,"BH")
+tmp$TfdrCD <- p.adjust(tmp$TCD,"BH")
+print(cbind(head(tmp$TfdrAC),head(tmp$TfdrBC),head(tmp$TfdrCD)))
+```
+
+## Fisher tests
+```{r echo=TRUE, eval=TRUE, results="verbatim", label="Benjamini-Hochberg P-value correction: Fisher tests"}
+tmp <- tmp %>% add_column(VfdrAC = 0)
+tmp <- tmp %>% add_column(VfdrBC = 0)
+tmp <- tmp %>% add_column(VfdrCD = 0)
+tmp$VfdrAC <- p.adjust(tmp$VAC,"BH")
+tmp$VfdrBC <- p.adjust(tmp$VBC,"BH")
+tmp$VfdrCD <- p.adjust(tmp$VCD,"BH")
+print(cbind(head(tmp$VfdrAC),head(tmp$VfdrBC),head(tmp$VfdrCD)))
+```
+
+# Specific Plots
+## Volcano Plot
+<<<<<<< HEAD
+```{r echo=T,eval=T,results="hold",label="Preparing data for volcano plots"}
+=======
+```{r echo=T,eval=T,results="hold",label="Volcano plotting data"}
+tmp$TAC <- apply(tmp,1,function(x) t.test(x[1:8],x[17:24])$p.value)
+tmp$TBC <- apply(tmp,1,function(x) t.test(x[9:16],x[17:24])$p.value)
+tmp$TCD <- apply(tmp,1,function(x) t.test(x[17:24],x[25:32])$p.value)
+>>>>>>> 2c9182e9240c7df3025bc8422ed955dfcb9a4931
+tmp$Amean <- rowMeans(tmp[,1:8])
+tmp$Bmean <- rowMeans(tmp[,9:16])
+tmp$Cmean <- rowMeans(tmp[,17:24])
+tmp$Dmean <- rowMeans(tmp[,25:32])
+tmp$logAC <- log2(tmp$Cmean / tmp$Amean)
+tmp$logBC <- log2(tmp$Cmean / tmp$Bmean)
+tmp$logCD <- log2(tmp$Dmean / tmp$Cmean)
+results <- data.frame(cbind(tmp$logAC,tmp$logBC,tmp$logCD,tmp$Amean,tmp$Bmean,tmp$Cmean,tmp$Dmean))
+<<<<<<< HEAD
+```
+```{r echo=T,eval=T,results="hold",label="Volcano plotting data: A versus C"}
+volcanoAC <- ggplot(results,aes(x=tmp$logAC,y=-log10(tmp$TAC)))
+volcanoAC + geom_point()
+```
+```{r echo=T,eval=T,results="hold",label="Volcano plotting data: B versus C"}
+=======
+volcanoAC <- ggplot(results,aes(x=tmp$logAC,y=tmp$TAC))
+volcanoAC + geom_point()
+```
+```{r echo=T,eval=T,results="hold",label="Volcano plotting data"}
+volcanoAC <- ggplot(results,aes(x=tmp$logAC,y=-log10(tmp$TAC)))
+volcanoAC + geom_point()
+```
+```{r echo=T,eval=T,results="hold",label="Volcano plotting data"}
+>>>>>>> 2c9182e9240c7df3025bc8422ed955dfcb9a4931
+volcanoBC <- ggplot(results,aes(x=tmp$logBC,y=-log10(tmp$TBC)))
+volcanoBC + geom_point()
+```
+
+<<<<<<< HEAD
+```{r echo=T,eval=T,results="hold",label="Volcano plotting data: C versus D"}
+=======
+```{r echo=T,eval=T,results="hold",label="Volcano plotting data"}
+>>>>>>> 2c9182e9240c7df3025bc8422ed955dfcb9a4931
+volcanoCD <- ggplot(results,aes(x=tmp$logCD,y=-log10(tmp$TCD)))
+volcanoCD + geom_point()
+```
