@@ -1,0 +1,215 @@
+---
+title: "Premiers essais sur le jeu de données"
+author: "Fabien KON-SUN-TACK"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+```
+
+```{r label="loading data"}
+library(tibble)
+library(dplyr)
+library(ggplot2)
+if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
+s = mreadRDS("../../data/study_hadaca_epic.rds")
+data <- s$data
+tmp <- data.frame(data)
+tmp <- tmp[complete.cases(tmp), ]
+```
+
+# Design 
+
+```{r exp_grp, echo=TRUE, results="verbatim"}
+table(substr(s$exp_grp$cond, 1, 4))
+print("4 conditions, 8 réplicats par condition")
+```
+
+## Data
+```{r echo=TRUE, results="verbatim", label = "Data Description"}
+head(s$data)
+
+colnames(s$platform)
+
+head(s$platform)
+A <- tmp[,1:8]
+print(head(A))
+B <- tmp[,9:16]
+print(head(B))
+C <- tmp[,17:24]
+print(head(C))
+D <- tmp[,25:32]
+print(head(D))
+```
+
+## Graphs
+```{r echo=TRUE, fig.width=9, fig.height=9, eval=TRUE, label="Plotting Data"}
+hist(data[,1:8], main="Condition A: HCT116 double KO DNMT1-DNMT3")
+hist(data[,9:16], main="Condition B: HCT116 simple KO DNMT1")
+hist(data[,17:24], main="Condition C: HCT116 WT serum")
+hist(data[,25:32], main="Condition D: HCT116 WT serum deprivation 24h")
+```
+
+
+# PCA
+
+```{r fig.width=9, fig.height=9, eval=TRUE, label="PCA"}
+if (!exists("pca")) {
+  data = s$data
+  dim(data)
+  # filtering...
+  idx = apply(is.na(data), 1, any)
+  sum(idx)
+  data = data[!idx,]
+  idx = apply(data, 1, function (l){
+    length(unique(l)) == 1
+  })
+  sum(idx)
+  data = data[!idx,]
+  dim(data)
+  set.seed(1)
+  pca = prcomp(t(data[sample(1:nrow(data), 1000),]), scale=TRUE)  
+}
+  
+v = pca$sdev * pca$sdev
+p = v / sum(v) * 100
+layout(matrix(1:4,2, byrow=FALSE), respect=TRUE)
+barplot(p)
+i=3
+j=2
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+i=1
+j=3
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+i=1
+j=2
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+```
+
+# Univariate Analysis
+
+## Student tests
+
+```{r echo=TRUE, eval=TRUE, results="verbatim", label="Student univariate tests"}
+tmp <- tmp %>% add_column(TAC = 0)
+tmp <- tmp %>% add_column(TBC = 0)
+tmp <- tmp %>% add_column(TCD = 0)
+tmp$TAC <- apply(tmp,1,function(x) t.test(x[1:8],x[17:24])$p.value)
+tmp$statAC <- apply(tmp,1,function(x) t.test(x[1:8], x[17:24])$statistic)
+tmp$TBC <- apply(tmp,1,function(x) t.test(x[9:16],x[17:24])$p.value)
+tmp$statBC <- apply(tmp,1,function(x) t.test(x[9:16],x[17:24])$statistic)
+tmp$TCD <- apply(tmp,1,function(x) t.test(x[17:24],x[25:32])$p.value)
+tmp$statCD <- apply(tmp,1,function(x) t.test(x[17:24],x[25:32])$statistic)
+
+```
+
+
+## Fisher tests
+```{r echo=TRUE, eval=TRUE, results="verbatim", label="Fisher univariate tests"}
+tmp <- tmp %>% add_column(VAC = 0)
+tmp <- tmp %>% add_column(VBC = 0)
+tmp <- tmp %>% add_column(VCD = 0)
+tmp$VAC <- apply(tmp,1,function(x) var.test(x[1:8],x[17:24])$p.value)
+tmp$varAC <- apply(tmp,1,function(x) var.test(x[1:8],x[17:24])$statistic)
+tmp$VBC <- apply(tmp,1,function(x) var.test(x[9:16],x[17:24])$p.value)
+tmp$varBC <- apply(tmp,1,function(x) var.test(x[9:16],x[17:24])$statistic)
+tmp$VCD <- apply(tmp,1,function(x) var.test(x[17:24],x[25:32])$p.value)
+tmp$varCD <- apply(tmp,1,function(x) var.test(x[17:24],x[25:32])$statistic)
+table <- data.frame(cbind(tmp$TAC,tmp$statAC, tmp$TBC,tmp$statBC, tmp$TCD,tmp$statCD,  tmp$VAC,tmp$varAC, tmp$VBC, tmp$varBC, tmp$VCD, tmp$varCD))
+if(!file.exists("table.rds")){saveRDS(table, "table.rds")}
+```
+
+# P-value Correction
+## Student tests
+```{r echo=TRUE, eval=TRUE, results="verbatim", label="Benjamini-Hochberg P-value correction: Student tests"}
+tmp <- tmp %>% add_column(TfdrAC = 0)
+tmp <- tmp %>% add_column(TfdrBC = 0)
+tmp <- tmp %>% add_column(TfdrCD = 0)
+tmp$TfdrAC <- p.adjust(tmp$TAC,method="BH")
+tmp$TfdrBC <- p.adjust(tmp$TBC,"BH")
+tmp$TfdrCD <- p.adjust(tmp$TCD,"BH")
+```
+
+## Fisher tests
+```{r echo=TRUE, eval=TRUE, results="verbatim", label="Benjamini-Hochberg P-value correction: Fisher tests"}
+tmp <- tmp %>% add_column(VfdrAC = 0)
+tmp <- tmp %>% add_column(VfdrBC = 0)
+tmp <- tmp %>% add_column(VfdrCD = 0)
+tmp$VfdrAC <- p.adjust(tmp$VAC,"BH")
+tmp$VfdrBC <- p.adjust(tmp$VBC,"BH")
+tmp$VfdrCD <- p.adjust(tmp$VCD,"BH")
+df <- data.frame(cbind(tmp$TfdrAC, tmp$TfdrBC, tmp$TfdrCD, tmp$VfdrAC, tmp$VfdrBC, tmp$VfdrCD))
+if(!file.exists("correct.rds")){saveRDS(df, "correct.rds")}
+```
+
+# Specific Plots
+## Volcano Plot
+```{r echo=T,eval=T,results="hold",label="Volcano plotting data"}
+tmp$Amean <- rowMeans(tmp[,1:8])
+tmp$Bmean <- rowMeans(tmp[,9:16])
+tmp$Cmean <- rowMeans(tmp[,17:24])
+tmp$Dmean <- rowMeans(tmp[,25:32])
+tmp$logAC <- tmp$Cmean - tmp$Amean
+tmp$logBC <- tmp$Cmean - tmp$Bmean
+tmp$logCD <- tmp$Dmean - tmp$Cmean
+results <- data.frame(cbind(tmp$logAC,tmp$logBC,tmp$logCD,tmp$Amean,tmp$Bmean,tmp$Cmean,tmp$Dmean, tmp$TfdrAC, tmp$TfdrBC, tmp$TfdrCD))
+```
+```{r echo=T,eval=T,results="hold"}
+volcanoAC <- ggplot(results,aes(x=tmp$logAC,y=-log10(tmp$TAC)))
+volcanoAC + geom_point()
+```
+```{r echo=T,eval=T,results="hold"}
+volcanoBC <- ggplot(results,aes(x=tmp$logBC,y=-log10(tmp$TBC)))
+volcanoBC + geom_point()
+```
+```{r echo=T,eval=T,results="hold"}
+volcanoCD <- ggplot(results,aes(x=tmp$logCD,y=-log10(tmp$TCD)))
+volcanoCD + geom_point()
+```
+
+```{r echo=T, eval=T, results="hold"}
+correct.volcanoAC <- ggplot(results, aes(tmp$logAC, -log10(tmp$TfdrAC)))
+correct.volcanoAC + geom_point()
+```
+```{r echo=T, eval=T, results="hold"}
+correct.volcanoBC <- ggplot(results, aes(tmp$logBC, -log10(tmp$TfdrBC)))
+correct.volcanoBC + geom_point()
+```
+
+```{r echo=T, eval=T, results="hold"}
+correct.volcanoCD <- ggplot(results, aes(tmp$logCD, -log10(tmp$TfdrCD)))
+correct.volcanoCD + geom_point()
+```
+
+```{r echo=T, eval=T, results="verbatim"}
+table <- mreadRDS("table.rds")
+stats <-table[table[,1] < 0.05 | table[,3] < 0.05 | table[,5] < 0.05, 1:6] 
+negAC <- data.frame(stats[stats[,2] < 0, 2])
+(nrow(negAC)/nrow(stats)) * 100
+negBC <- data.frame(stats[stats[,4] < 0, 4])
+(nrow(negBC)/nrow(stats)) * 100
+negCD <- data.frame(stats[stats[,6] < 0, 6])
+(nrow(negCD)/nrow(stats)) * 100
+posAC <- data.frame(stats[stats[,2] > 0, 2])
+(nrow(posAC)/nrow(stats)) * 100
+posBC <- data.frame(stats[stats[,4] > 0, 4])
+(nrow(posBC)/nrow(stats)) * 100
+posCD <- data.frame(stats[stats[,6] > 0, 6])
+(nrow(posCD)/nrow(stats)) * 100
+varsAC <- table[table[,1] < 0.05 & table[,7] < 0.05,c(1,2,7,8)]
+(nrow(varsAC)/nrow(table)) * 100
+varsBC <- table[table[,3] < 0.05 & table[,9] < 0.05,c(3,4,9,10)]
+(nrow(varsBC)/nrow(table)) * 100
+varsCD <- table[table[,5] < 0.05 & table[,11] < 0.05,c(5,6,11,12)]
+(nrow(varsCD)/nrow(table)) * 100
+```
