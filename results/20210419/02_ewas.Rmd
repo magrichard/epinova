@@ -23,6 +23,8 @@ if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
 d = s$data
 e = s$exp_grp
 e$cond = substr(s$exp_grp$cond, 1, 4)
+
+nb_probes = 10000
 ```
 
 # Design 
@@ -61,7 +63,7 @@ hist(d[,idx_D], main="Condition D: HCT116 WT serum deprivation 24h")
 apply_func = apply
 apply_func = epimedtools::monitored_apply
 # if (!file.exists("ewas_mean.rds")) {
-  ewas_mean = apply_func(d[1:1000,] , 1, function(l) {  
+  ewas_mean = apply_func(d[1:nb_probes,] , 1, function(l) {  
     # print(l)
     # l = d[1,]
     
@@ -105,9 +107,10 @@ apply_func = epimedtools::monitored_apply
 
 
 ## Fisher tests (variance)
+
 ```{r ewas_var, echo=TRUE, eval=TRUE, results="verbatim"}
 # if (!file.exists("ewas_var.rds")) {
-  ewas_var <- apply_func(d[1:1000,] , 1, function(l) {  
+  ewas_var <- apply_func(d[1:nb_probes,] , 1, function(l) {  
     # print(l)
     # l = d[1,]
   
@@ -118,9 +121,9 @@ apply_func = epimedtools::monitored_apply
     pval_AC = vtest_AC$p.value 
     pval_BC = vtest_BC$p.value 
     pval_DC = vtest_DC$p.value 
-    beta_AC = vtest_AC$estimate[[1]]
-    beta_BC = vtest_BC$estimate[[1]]
-    beta_DC = vtest_DC$estimate[[1]]
+    beta_AC = log2(vtest_AC$estimate[[1]])
+    beta_BC = log2(vtest_BC$estimate[[1]])
+    beta_DC = log2(vtest_DC$estimate[[1]])
 
     ret = c(
       pval_AC = pval_AC,
@@ -227,6 +230,18 @@ plot( ewas_var$beta_DC, -log10( ewas_var$padj_DC), xlab="beta", ylab="-log10(pad
 # ```
 ```
 
+
+```{r}
+layout(matrix(1:2,1), respect=TRUE)
+
+plot(ewas_mean$beta_DC, ewas_var$beta_DC)
+plot(-log10(ewas_mean$pval_DC), -log10(ewas_var$pval_DC))
+
+plot(ewas_mean$beta_AC, ewas_var$beta_AC)
+plot(-log10(ewas_mean$pval_AC), -log10(ewas_var$pval_AC))
+
+
+```
 
 
 
