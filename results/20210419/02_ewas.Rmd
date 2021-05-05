@@ -15,16 +15,16 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 ```
 
 ```{r loading_data}
-library(tibble)
-library(dplyr)
-library(ggplot2)
 if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
-# s = mreadRDS("../../data/study_hadaca_epic.rds")
+s = mreadRDS("../../data/study_hadaca_epic.rds")
+NAS = apply(is.na(s$data), 2, which)
+NAS[1]
 d = s$data
+d = na.omit(d)
 e = s$exp_grp
 e$cond = substr(s$exp_grp$cond, 1, 4)
 
-nb_probes = 10000
+nb_probes = nrow(d)
 ```
 
 # Design 
@@ -60,32 +60,32 @@ hist(d[,idx_D], main="Condition D: HCT116 WT serum deprivation 24h")
 ## Student tests
 
 ```{r ewas_mean, echo=TRUE, eval=TRUE, results="verbatim"}
-apply_func = apply
-apply_func = epimedtools::monitored_apply
-# if (!file.exists("ewas_mean.rds")) {
-  ewas_mean = apply_func(d[1:nb_probes,] , 1, function(l) {  
+apply_func =  apply
+apply_func =  epimedtools::monitored_apply
+if (!file.exists("ewas_mean.rds")) {
+  ewas_mean =  apply_func(d[1:nb_probes,] , 1, function(l) {  
     # print(l)
     # l = d[1,]
     
-    data = e[colnames(d),]
-    data$meth = l
-    m_AC = lm(meth~cond, data[c(idx_A, idx_C),])
-    m_BC = lm(meth~cond, data[c(idx_B, idx_C),])
-    m_DC = lm(meth~cond, data[c(idx_D, idx_C),])
-  
-    fstat_AC = summary(m_AC)$fstatistic
-    fstat_BC = summary(m_BC)$fstatistic
-    fstat_DC = summary(m_DC)$fstatistic
+    data =  e[colnames(d),]
+    data$meth =  l
+    m_AC =  lm(meth~cond, data[c(idx_A, idx_C),])
+    m_BC =  lm(meth~cond, data[c(idx_B, idx_C),])
+    m_DC =  lm(meth~cond, data[c(idx_D, idx_C),])
+    
+    fstat_AC =  summary(m_AC)$fstatistic
+    fstat_BC =  summary(m_BC)$fstatistic
+    fstat_DC =  summary(m_DC)$fstatistic
 
-    pval_AC = 1 - pf(fstat_AC[1], fstat_AC[2], fstat_AC[3]) # anova(m_AC)[1,5]
-    pval_BC = 1 - pf(fstat_BC[1], fstat_BC[2], fstat_BC[3]) # anova(m_BC)[1,5]
-    pval_DC = 1 - pf(fstat_DC[1], fstat_DC[2], fstat_DC[3]) # anova(m_DC)[1,5]
+    pval_AC =  1 - pf(fstat_AC[1], fstat_AC[2], fstat_AC[3]) # anova(m_AC)[1,5]
+    pval_BC =  1 - pf(fstat_BC[1], fstat_BC[2], fstat_BC[3]) # anova(m_BC)[1,5]
+    pval_DC =  1 - pf(fstat_DC[1], fstat_DC[2], fstat_DC[3]) # anova(m_DC)[1,5]
 
-    beta_AC = m_AC$coef[[2]]
-    beta_BC = m_BC$coef[[2]]
-    beta_DC = m_DC$coef[[2]]
+    beta_AC =  m_AC$coef[[2]]
+    beta_BC =  m_BC$coef[[2]]
+    beta_DC =  m_DC$coef[[2]]
 
-    ret = c(
+    ret <-  c(
       pval_AC = pval_AC,
       pval_BC = pval_BC,
       pval_DC = pval_DC,
@@ -99,9 +99,9 @@ apply_func = epimedtools::monitored_apply
   )
   ewas_mean = data.frame(t(ewas_mean))
   head(ewas_mean)
-#   saveRDS(ewas_mean, "ewas_mean.rds")
-# }
-# ewas_mean = readRDS("ewas_mean.rds")
+  saveRDS(ewas_mean, "ewas_mean.rds")
+  }
+  ewas_mean = readRDS("ewas_mean.rds")
 
 ```
 
@@ -109,7 +109,7 @@ apply_func = epimedtools::monitored_apply
 ## Fisher tests (variance)
 
 ```{r ewas_var, echo=TRUE, eval=TRUE, results="verbatim"}
-# if (!file.exists("ewas_var.rds")) {
+if (!file.exists("ewas_var.rds")) {
   ewas_var <- apply_func(d[1:nb_probes,] , 1, function(l) {  
     # print(l)
     # l = d[1,]
@@ -139,9 +139,9 @@ apply_func = epimedtools::monitored_apply
   )
   ewas_var = data.frame(t(ewas_var))
   head(ewas_var)
-#   saveRDS(ewas_var, "ewas_var.rds")
-# }
-# ewas_var = readRDS("ewas_var.rds")
+  saveRDS(ewas_var, "ewas_var.rds")
+ }
+ ewas_var = readRDS("ewas_var.rds")
 ```
 
 
@@ -168,6 +168,24 @@ abline(a=0, b=1)
 abline(v=-log10(0.05), col=2, lty=2)
 
 plot(-log10(ewas_mean$padj_AC), -log10(ewas_mean$pval_AC), xlim=c(0, 2), ylim=c(0, 2), )
+abline(a=0, b=1)
+abline(v=-log10(0.05), col=2, lty=2)
+abline(h=-log10(0.05), col=4, lty=2)
+
+plot(-log10(ewas_mean$padj_DC), -log10(ewas_mean$pval_DC))
+abline(a=0, b=1)
+abline(v=-log10(0.05), col=2, lty=2)
+
+plot(-log10(ewas_mean$padj_DC), -log10(ewas_mean$pval_DC), xlim=c(0, 2), ylim=c(0, 2), )
+abline(a=0, b=1)
+abline(v=-log10(0.05), col=2, lty=2)
+abline(h=-log10(0.05), col=4, lty=2)
+
+plot(-log10(ewas_mean$padj_BC), -log10(ewas_mean$pval_BC))
+abline(a=0, b=1)
+abline(v=-log10(0.05), col=2, lty=2)
+
+plot(-log10(ewas_mean$padj_BC), -log10(ewas_mean$pval_BC), xlim=c(0, 2), ylim=c(0, 2), )
 abline(a=0, b=1)
 abline(v=-log10(0.05), col=2, lty=2)
 abline(h=-log10(0.05), col=4, lty=2)
@@ -206,30 +224,36 @@ plot( ewas_var$beta_DC, -log10( ewas_var$pval_DC), xlab="beta", ylab="-log10(pva
 plot( ewas_var$beta_DC, -log10( ewas_var$padj_DC), xlab="beta", ylab="-log10(padj)", main="cond D vs. cond C, _var")
 
 
-# ```{r echo=T, eval=T, results="verbatim"}
-# table <- mreadRDS("table.rds")
-# stats <-table[table[,1] < 0.05 | table[,3] < 0.05 | table[,5] < 0.05, 1:6]
-# negAC <- data.frame(stats[stats[,2] < 0, 2])
-# (nrow(negAC)/nrow(stats)) * 100
-# negBC <- data.frame(stats[stats[,4] < 0, 4])
-# (nrow(negBC)/nrow(stats)) * 100
-# negCD <- data.frame(stats[stats[,6] < 0, 6])
-# (nrow(negCD)/nrow(stats)) * 100
-# posAC <- data.frame(stats[stats[,2] > 0, 2])
-# (nrow(posAC)/nrow(stats)) * 100
-# posBC <- data.frame(stats[stats[,4] > 0, 4])
-# (nrow(posBC)/nrow(stats)) * 100
-# posCD <- data.frame(stats[stats[,6] > 0, 6])
-# (nrow(posCD)/nrow(stats)) * 100
-# varsAC <- table[table[,1] < 0.05 & table[,7] < 0.05,c(1,2,7,8)]
-# (nrow(varsAC)/nrow(table)) * 100
-# varsBC <- table[table[,3] < 0.05 & table[,9] < 0.05,c(3,4,9,10)]
-# (nrow(varsBC)/nrow(table)) * 100
-# varsCD <- table[table[,5] < 0.05 & table[,11] < 0.05,c(5,6,11,12)]
-# (nrow(varsCD)/nrow(table)) * 100
-# ```
 ```
+```{r echo=T, eval=T, results="verbatim"}
 
+stats <-ewas_mean[ewas_mean[,1] < 0.05 | ewas_mean[,2] < 0.05 | ewas_mean[,3] < 0.05,]
+negAC <- data.frame(stats[stats[,4] < 0, 4])
+(nrow(negAC)/nrow(stats)) * 100
+negBC <- data.frame(stats[stats[,5] < 0, 5])
+(nrow(negBC)/nrow(stats)) * 100
+negDC <- data.frame(stats[stats[,6] < 0, 6])
+(nrow(negDC)/nrow(stats)) * 100
+posAC <- data.frame(stats[stats[,4] > 0, 4])
+(nrow(posAC)/nrow(stats)) * 100
+posBC <- data.frame(stats[stats[,5] > 0, 5])
+(nrow(posBC)/nrow(stats)) * 100
+posDC <- data.frame(stats[stats[,6] > 0, 6])
+(nrow(posDC)/nrow(stats)) * 100
+vars <-ewas_var[ewas_var[,1] < 0.05 | ewas_var[,2] < 0.05 | ewas_var[,3] < 0.05,]
+negAC <- data.frame(stats[stats[,4] < 0, 4])
+(nrow(negAC)/nrow(stats)) * 100
+negBC <- data.frame(stats[stats[,5] < 0, 5])
+(nrow(negBC)/nrow(stats)) * 100
+negDC <- data.frame(stats[stats[,6] < 0, 6])
+(nrow(negDC)/nrow(stats)) * 100
+posAC <- data.frame(stats[stats[,4] > 0, 4])
+(nrow(posAC)/nrow(stats)) * 100
+posBC <- data.frame(stats[stats[,5] > 0, 5])
+(nrow(posBC)/nrow(stats)) * 100
+posDC <- data.frame(stats[stats[,6] > 0, 6])
+(nrow(posDC)/nrow(stats)) * 100
+```
 
 ```{r}
 layout(matrix(1:2,1), respect=TRUE)
@@ -237,13 +261,19 @@ layout(matrix(1:2,1), respect=TRUE)
 plot(ewas_mean$beta_DC, ewas_var$beta_DC)
 plot(-log10(ewas_mean$pval_DC), -log10(ewas_var$pval_DC))
 
+plot(ewas_mean$beta_BC, ewas_var$beta_BC)
+plot(-log10(ewas_mean$pval_BC), -log10(ewas_var$pval_BC))
+
 plot(ewas_mean$beta_AC, ewas_var$beta_AC)
 plot(-log10(ewas_mean$pval_AC), -log10(ewas_var$pval_AC))
 
 
 ```
 
-
+# ```{manhattan r echo=T, eval=T, results="verbatim"}
+# EWAS_plots(ewas_mean, plot_Man = T, save_name = "ewas_mean")
+# 
+# ```
 
 
 # Session Information
