@@ -1,0 +1,236 @@
+---
+title: "Comb-p on EWAS outputs"
+author: "Fabien Kon-Sun-Tack, Florent Chuffart"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+```
+
+# Reading `ewas_mean`  outputs
+
+
+```{r plot_ewas}
+prefix = "ewas_mean"
+ewas_mean = mreadRDS(paste0(prefix, ".rds"))
+head(ewas_mean)
+ewas = ewas_mean[,c("beta_DC", "pval_DC.value")]
+colnames(ewas) = c("beta", "lpv")
+ewas$lpv = -log10(ewas$lpv)
+layout(matrix(1:2, 1), respect=TRUE,)
+plot(ewas[,"beta"], ewas[,"lpv"], main="Volcano plot", pch=".")
+```
+
+# Export EWAS for `Comb-p`
+
+```{r build_bed}
+range(ewas[,"lpv"])
+range(ewas[,"beta"])
+s = mreadRDS("../../data/study_hadaca_epic.rds")
+pf = s$platform
+head(ewas)
+head(pf[,1:6])
+lpval = ewas[,"lpv"]
+names(lpval) = rownames(ewas)
+# plot(lpval, main="Manhattan plot")
+```
+
+Comb-p does not apreciate p-val lower that $10^{-45}$.
+It produces `nan` values.
+The following code cheats on this point.
+
+```{r}
+layout(matrix(1:2, 1), respect=TRUE)
+plot(density(lpval), main="original pval")
+# if (max(lpval)>40) {
+#   lpval = 40*lpval/max(lpval)
+# }
+lpval[lpval > 30] = (15*(lpval[lpval>30]-30)/(max(lpval)-30))+30
+# lpval[lpval > 40] = 40
+plot(density(lpval), main="hacked pval")
+
+```
+
+```{r}
+pval = 10^-lpval
+# build and write bed file
+bed = pf[rownames(ewas),1:3] # Warning, here pf is global, it must be arg and indexed!!
+head(bed)
+bed$probes = names(pval)
+bed$pval = pval
+bed$strand = "+"
+colnames(bed) = c("chrom", "start", "end", "probes", "pval", "strand")
+head(bed)
+
+# write ewas res for combp
+bed_ewas_filename = paste0("ewas4combp_", prefix,".bed")
+bed[,1] = as.character(bed[,1])
+bed = bed[order(bed[,1], bed[,2]),]
+write.table(bed,file=bed_ewas_filename , sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
+# bed = read.table(ewas_filename, sep="\t", header=TRUE)
+```
+
+# Run `Comb-p`
+
+```{r combp}
+pval_tresh = 10^-2
+prefix2 = paste0(prefix, "_", pval_tresh)
+# Run comb-p, run!!
+cmd = "comb-p"
+arg = paste0("pipeline -c 5 --seed ", pval_tresh, " --dist 1000 -p dmr_", prefix2," --region-filter-p 0.05 --region-filter-n 2 ", bed_ewas_filename)
+print(paste(cmd, arg))
+system2(cmd, arg)
+```
+
+# Results
+
+
+Co-localization of Protein Z, Protein Z-Dependent protease inhibitor and coagulation factor X in human colon cancer tissue: implications for coagulation regulation on tumor cells.
+Sierko E, Wojtukiewicz MZ, Zimnoch L, Tokajuk P, Ostrowska-Cichocka K, Kisiel W.
+Thromb Res. 2012 Apr;129(4):e112-8. doi: 10.1016/j.thromres.2011.10.027. Epub 2011 Nov 17.
+PMID: 22424030
+
+ 
+Protein Z is present in human breast cancer tissue.
+Sierko E, Wojtukiewicz MZ, Zimnoch L, Tokajuk P, Kisiel W.
+Int J Hematol. 2011 May;93(5):681-683. doi: 10.1007/s12185-011-0846-3. Epub 2011 Apr 12.
+PMID: 21479979 No abstract available.
+
+Unbalance between plasma levels of Protein Z and protein Z-dependent inhibitor in patients with colorectal and pancreatic cancer: a pilot study.
+Doat S, Borgel D, François JH, Bianchini E, Botton J, François D, Mitry E, Vasse M.
+Thromb Res. 2014 Feb;133(2):299-300. doi: 10.1016/j.thromres.2013.11.015. Epub 2013 Nov 22.
+PMID: 24315319 No abstract available.
+
+
+Protein Z/protein Z-dependent protease inhibitor system in human non-small-cell lung cancer tissue.
+Sierko E, Wojtukiewicz MZ, Zimnoch L, Ostrowska-Cichocka K, Tokajuk P, Ramlau R, Kisiel W.
+Thromb Res. 2012 Apr;129(4):e92-6. doi: 10.1016/j.thromres.2011.09.005. Epub 2011 Oct 4.
+PMID: 21975032
+
+Protein Z/protein Z-dependent protease inhibitor system in loco in human gastric cancer.
+Sierko E, Wojtukiewicz MZ, Zimnoch L, Tokajuk P, Ostrowska-Cichocka K, Kisiel W.
+Ann Hematol. 2014 May;93(5):779-84. doi: 10.1007/s00277-013-1941-8. Epub 2013 Oct 26.
+PMID: 24158387 Free PMC article.
+
+Intron F G79A polymorphism of the protein Z gene in cancer patients with and without thrombosis.
+Eroglu A, Ozturk A, Cam R, Akar N.
+J Thromb Thrombolysis. 2009 Feb;27(2):204-6. doi: 10.1007/s11239-008-0199-9. Epub 2008 Feb 5.
+PMID: 18246466
+
+
+```{r results}
+# Read comb-p ewas input
+bed_ewas = read.table(bed_ewas_filename, sep="\t", header=TRUE)
+rownames(bed_ewas) = bed_ewas$probes
+head(bed_ewas)
+dim(bed_ewas)
+
+# Read comb-p outputs
+probes_file = paste0("dmr_", prefix2, ".fdr.bed.gz")
+if (file.exists(probes_file)) {
+  probes = read.table(gzfile(probes_file), comment="@", header=TRUE);
+} else {
+  warning(paste0("probes_file ", probes_file, " does not exist. Have to fix it! "))
+  return(NULL)    
+}
+head(probes)
+dim(probes)
+if (sum( paste0(bed_ewas[,1], ":", bed_ewas[,2], "-", bed_ewas[,3]) !=  paste0(probes[,1], ":", probes[,2], "-", probes[,3])) != 0) {
+  stop("Error when namimg probes.")
+}
+rownames(probes) = rownames(bed_ewas)
+
+regions_file = paste0("dmr_", prefix2, ".regions-t.bed"   )
+if (file.exists(regions_file)) {
+  regions = read.table(regions_file, comment="@", header=TRUE, stringsAsFactors=FALSE)
+} else {
+  warning(paste0("regions_file ", regions_file, " does not exist. Have to fix it! "))
+  return(NULL)
+}
+
+rownames(regions) = paste0(regions[,1], ":", regions[,2], "-", regions[,3])
+head(regions[ rev(order(regions$n_probes)),],50)
+bed_regions = regions
+bed_regions[,4] = paste0(bed_regions[,1], ":", bed_regions[,2], "-", bed_regions[,3])
+bed_regions[,5] = bed_regions[,"z_sidak_p"]
+bed_regions[,6] = "+"
+bed_regions = bed_regions[,1:6]
+colnames(bed_regions) = c("chr", "start", "end", "name", "pval", "strand")
+head(bed_regions)
+
+
+# get probes
+# idx_region = "chr12:114698194-114698504" #which(bed_regions[3]-bed_regions[2]==max(bed_regions[3]-bed_regions[2]))[1]
+# idx_region = "chr6:32167275-32167620"
+#
+# chr17:48544347 48582736
+# chr6 31568115 31582465
+# gene = bed_regions[idx_region,]
+gene = list("chr13", 113158210, 113158673, "PROZ", "1", "+")
+# gene = list("chr11", 816000, 825500, "PNPLA2", "1", "+")
+# gene = list("chr7", 27101178, 27145894, "HOXA", "1", "+")
+# gene = list("chr6", 31559930, 31593095, "TNF", "1", "+")
+# gene = list("chr4", 1192127, 1231942, "CTBP1", "1", "+")
+# gene = list("chr14", 22400000, 22700000, "DAD1", "1", "+")
+# gene = list("chr12", 124500726, 124528633, "NCOR2", "1", "+")
+print(gene)
+pf_meth = probes
+pf_chr_colname = "X.chrom"
+pf_pos_colname = "start"
+up_str = 0
+dwn_str = gene[[3]] - gene[[2]]
+idx_probes = dmprocr::get_probe_names(gene, pf_meth, pf_chr_colname, pf_pos_colname, up_str, dwn_str)
+
+
+
+
+layout(matrix(c(2, 2, 1, 1, 1, 1), 2), respect=TRUE)
+ylim = c(0, min(max(-log10(probes[idx_probes[idx_probes%in%rownames(probes)],4:6])), 45))
+plot(-log10(probes[idx_probes,]$p), col="grey", main=prefix2, ylim=ylim, pch=16)
+points(-log10(probes[idx_probes,]$region.p), col=4, pch=16)
+points(-log10(probes[idx_probes,]$region.q), col=2, pch=16)
+legend("topright", legend=c("ewas pval", "slk pval", "slk qval"), col = c("grey", "blue", "red"), pch=16)
+
+# plot it
+layout(1)
+plot(probes[idx_probes,]$start, -log10(probes[idx_probes,]$p), col="grey", main=prefix2, ylim=ylim, pch=16)
+points(probes[idx_probes,]$start, -log10(probes[idx_probes,]$region.p), col=4, pch=16)
+points(probes[idx_probes,]$start, -log10(probes[idx_probes,]$region.q), col=2, pch=16)
+# segments(regions[idx_region,]$star, -log10(as.numeric(pval_tresh)), regions[idx_region,]$end, -log10(as.numeric(pval_tresh)), col=2)
+legend("topright", legend=c("ewas pval", "slk pval", "slk qval"), col = c("grey", "blue", "red"), pch=16)
+
+
+
+
+d = s$data
+e = s$exp_grp
+
+idx_sample = rownames(e)[substr(rownames(e),1, 1)%in% c("C", "D")]
+
+par(mar=c(10, 4.1, 4.1, 2.1))
+layout(matrix(c(1, 1, 2, 2, 2, 2), 2), respect=TRUE)
+plot(as.numeric(as.factor(substr(idx_sample,1, 1))), 1:length(idx_sample)) 
+colors = c("cyan", "black", "red")
+cols = colorRampPalette(colors)(20)
+breaks = seq(0, 1, length.out = length(cols) + 1)
+main = gene[[4]]
+image(d[idx_probes,idx_sample], col=cols, breaks=breaks, xaxt="n", yaxt="n", main=main)
+axis(1, (1:nrow(d[idx_probes,idx_sample]) - 1)/(nrow(d[idx_probes,idx_sample]) - 1), rownames(d[idx_probes,idx_sample]), las = 2)
+```
+
+
+
+
+# Session Information
+
+```{r results="verbatim"}
+sessionInfo()
+```
+
