@@ -19,35 +19,6 @@ if (!exists("mreadRDS")) {
   mreadRDS = memoise::memoise(function(...) {print("reading..."); ret=readRDS(...); print("done."); return(ret)})
 }
 s = mreadRDS("../../data/study_hadaca_epic.rds")
-<<<<<<< HEAD
-=======
-
-
-s$dest_dir                s$platform                s$gse
-s$cel_filedirs            s$platform_filename       s$series_matrix_filename
-s$cel_files               s$platform_name           s$stuffs
-s$data                    s$cache_filename          
-s$exp_grp                 s$gset 
-
-for (n in  names(s)[-c(6)]) {
-# for (n in  names(s)) {
-  fn = paste0(n, ".rds")
-  print(fn)
-  # print("  writing")
-  # saveRDS(s[[n]], fn)
-  print("  reading")
-  e = mreadRDS(fn)
-}
-
-n = "foo"
-fn = paste0(n, ".rds")
-print(fn)
-print("  writing")
-saveRDS(n, fn)
-print("  reading")
-e = mreadRDS(fn)
-
->>>>>>> c87026f3220fe9524252cf6c7b257b47d4b68f3b
 
 # for (n in  names(s)[-c(6)]) {
 # # for (n in  names(s)) {
@@ -73,12 +44,7 @@ e = mreadRDS(fn)
 # saveRDS(s$data, "d.rds")
 # d = mreadRDS("d.rds")
 
-<<<<<<< HEAD
 NAS = apply(is.na(s$data), 2, which)
-=======
-# NAS = apply(is.na(s$data), 2, which)
-# NAS[1]
->>>>>>> c87026f3220fe9524252cf6c7b257b47d4b68f3b
 
 d = s$data
 sum(is.na(d))
@@ -87,12 +53,9 @@ d = na.omit(d)
 dim(d)
 sum(is.na(d))
 
-<<<<<<< HEAD
 
 
 
-=======
->>>>>>> c87026f3220fe9524252cf6c7b257b47d4b68f3b
 e = s$exp_grp
 e$cond = substr(s$exp_grp$cond, 1, 4)
 
