@@ -19,7 +19,6 @@ if (!exists("mreadRDS")) {
   mreadRDS = memoise::memoise(function(...) {print("reading..."); ret=readRDS(...); print("done."); return(ret)})
 }
 s = mreadRDS("../../data/study_hadaca_epic.rds")
-<<<<<<< HEAD
 
 
 s$dest_dir                s$platform                s$gse
@@ -54,20 +53,14 @@ d = mreadRDS("d.rds")
 
 # NAS = apply(is.na(s$data), 2, which)
 # NAS[1]
-=======
-NAS = apply(is.na(s$data), 2, which)
->>>>>>> 2cc333d73abe328fc96e5c03a8709e75bcbad9ee
+
 d = s$data
 sum(is.na(d))
 dim(d)
 d = na.omit(d)
-<<<<<<< HEAD
 dim(d)
 sum(is.na(d))
 
-=======
-sum(is.na(d))
->>>>>>> 2cc333d73abe328fc96e5c03a8709e75bcbad9ee
 e = s$exp_grp
 e$cond = substr(s$exp_grp$cond, 1, 4)
 
