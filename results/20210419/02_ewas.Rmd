@@ -15,12 +15,51 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 ```
 
 ```{r loading_data}
-if (!exists("mreadRDS")) {mreadRDS = memoise::memoise(readRDS)}
+if (!exists("mreadRDS")) {
+  mreadRDS = memoise::memoise(function(...) {print("reading..."); ret=readRDS(...); print("done."); return(ret)})
+}
 s = mreadRDS("../../data/study_hadaca_epic.rds")
-NAS = apply(is.na(s$data), 2, which)
-NAS[1]
+
+
+s$dest_dir                s$platform                s$gse
+s$cel_filedirs            s$platform_filename       s$series_matrix_filename
+s$cel_files               s$platform_name           s$stuffs
+s$data                    s$cache_filename          
+s$exp_grp                 s$gset 
+
+for (n in  names(s)[-c(6)]) {
+# for (n in  names(s)) {
+  fn = paste0(n, ".rds")
+  print(fn)
+  # print("  writing")
+  # saveRDS(s[[n]], fn)
+  print("  reading")
+  e = mreadRDS(fn)
+}
+
+n = "foo"
+fn = paste0(n, ".rds")
+print(fn)
+print("  writing")
+saveRDS(n, fn)
+print("  reading")
+e = mreadRDS(fn)
+
+
+saveRDS(s$exp_grp, "e.rds")
+e = mreadRDS("e.rds")
+saveRDS(s$data, "d.rds")
+d = mreadRDS("d.rds")
+
+# NAS = apply(is.na(s$data), 2, which)
+# NAS[1]
 d = s$data
+sum(is.na(d))
+dim(d)
 d = na.omit(d)
+dim(d)
+sum(is.na(d))
+
 e = s$exp_grp
 e$cond = substr(s$exp_grp$cond, 1, 4)
 
