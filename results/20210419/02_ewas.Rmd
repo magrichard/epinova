@@ -273,9 +273,9 @@ abline(h= -log10(FDR(ewas_mean$pval_BC)), col=3, lty=2)
 
 ```{r echo=T, eval=T}
 layout(matrix(c(1:3,1)), respect = TRUE)
-qqplot(-log10(ewas_mean$padj_AC), -log10(ewas_mean$pval_AC), pch-".")
-qqplot(-log10(ewas_mean$padj_BC), -log10(ewas_mean$pval_BC), pch-".")
-qqplot(-log10(ewas_mean$padj_DC), -log10(ewas_mean$pval_DC), pch-".")
+qqplot(-log10(ewas_mean$padj_AC), -log10(ewas_mean$pval_AC), pch=".")
+qqplot(-log10(ewas_mean$padj_BC), -log10(ewas_mean$pval_BC), pch=".")
+qqplot(-log10(ewas_mean$padj_DC), -log10(ewas_mean$pval_DC), pch=".")
 ```
 
 # Volcano Plot
