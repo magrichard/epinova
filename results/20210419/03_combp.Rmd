@@ -21,6 +21,7 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 prefix = "ewas_mean"
 ewas_mean = mreadRDS(paste0(prefix, ".rds"))
 head(ewas_mean)
+
 ewas = ewas_mean[,c("beta_DC", "pval_DC.value")]
 colnames(ewas) = c("beta", "lpv")
 ewas$lpv = -log10(ewas$lpv)
@@ -33,7 +34,7 @@ plot(ewas[,"beta"], ewas[,"lpv"], main="Volcano plot", pch=".")
 ```{r build_bed}
 range(ewas[,"lpv"])
 range(ewas[,"beta"])
-s = mreadRDS("../../data/study_hadaca_epic.rds")
+# s = mreadRDS("../../data/study_hadaca_epic.rds")
 pf = s$platform
 head(ewas)
 head(pf[,1:6])
@@ -55,13 +56,12 @@ plot(density(lpval), main="original pval")
 lpval[lpval > 30] = (15*(lpval[lpval>30]-30)/(max(lpval)-30))+30
 # lpval[lpval > 40] = 40
 plot(density(lpval), main="hacked pval")
-
 ```
 
 ```{r}
 pval = 10^-lpval
 # build and write bed file
-bed = pf[rownames(ewas),1:3] # Warning, here pf is global, it must be arg and indexed!!
+bed = pf[names(pval),1:3] # Warning, here pf is global, it must be arg and indexed!!
 head(bed)
 bed$probes = names(pval)
 bed$pval = pval
