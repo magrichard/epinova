@@ -267,17 +267,11 @@ library(reshape2)
 library(ggplot2)
 df = melt(d[idx_probes,idx_sample], id.vars = colnames(d[idx_probes,idx_sample]))
 names(df) = c("probes", "conditions", "value")
-df$conditions = as.factor(df$conditions)
-cond = df$conditions
-levels(cond) = list(C = c("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"), D = c("D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"))
+df$cond = substr(df$conditions,1,1)
 plot = ggplot(df, aes(x=probes, y=value, color=cond)) + geom_point()
 plot
 
-bed_ewas$beta_C = as.factor(bed_ewas$beta_C)
-bed_ewas$beta_D = as.factor(bed_ewas$beta_D)
-
-ggplot(bed_ewas[idx_probes,], aes(x=probes), color=c(beta_C, beta_D))+geom_point(aes(y=beta_C), colour="red") +geom_point(aes(y=beta_D),  colour="blue")
-
+boxplot(value~cond+probes,df, las=2,border=c(2,4), ylim=c(0,1))
 
 ```
 ```{r test, eval=T, results="verbatim"}
@@ -286,14 +280,21 @@ idx_D = colnames(d)[25:32]
 don = na.omit(d)
 test = apply_func(don[idx_probes,], 1, function(l){
   #print(l)
+  #l = don[idx_probes[1],]
   data = e[colnames(don),]
   data$meth = l
   m_DC = lm(meth~cond, data[c(idx_D, idx_C),])
-  plot(m_DC)
+  m_DC$coef
+  data[idx_C,]
+  boxplot(meth~cond, data[c(idx_D, idx_C),])
+  abline(h=mean(data[idx_C,3]), col=4)
+  abline(h=mean(data[idx_D,3]), col=2)
+  abline(h=m_DC$coef[[1]], lty=2)
+  abline(h=m_DC$coef[[1]]+m_DC$coef[[2]], lty=3)
+
 }
 )
-test = t(test)
-head(test)
+
 ```
 # Session Information
 
