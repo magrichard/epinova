@@ -113,7 +113,7 @@ hist(d[,idx_D], main="Condition D: HCT116 WT serum deprivation 24h")
 
 ## Student tests
 
-```{r ewas_mean, echo=TRUE, eval=TRUE, results="verbatim"}
+```{r ewas_mean, echo=F, eval=TRUE, results="verbatim"}
 apply_func =  apply
 apply_func =  epimedtools::monitored_apply
 if (!file.exists("ewas_mean.rds")) {
@@ -137,7 +137,8 @@ if (!file.exists("ewas_mean.rds")) {
 
     beta_AC =  m_AC$coef[[2]]
     beta_BC =  m_BC$coef[[2]]
-    beta_DC =  m_DC$coef[[2]]
+    beta_C =  m_DC$coef[[2]]
+    beta_D = m_DC$coef[[1]]
 
     ret <-  c(
       pval_AC = pval_AC,
@@ -145,7 +146,8 @@ if (!file.exists("ewas_mean.rds")) {
       pval_DC = pval_DC,
       beta_AC = beta_AC,
       beta_BC = beta_BC,
-      beta_DC = beta_DC,
+      beta_C = beta_C,
+      beta_D = beta_D,
       NULL
     )
     return(ret)
