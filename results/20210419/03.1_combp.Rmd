@@ -25,8 +25,8 @@ prefix = "ewas_mean"
 ewas_mean = mreadRDS(paste0(prefix, ".rds"))
 head(ewas_mean)
 
-ewas = ewas_mean[,c("beta_DC", "pval_DC.value")]
-colnames(ewas) = c("beta", "lpv")
+ewas = ewas_mean[,c("beta_C","beta_D","pval_DC.value")]
+colnames(ewas) = c("beta_C", "beta_D", "lpv")
 ewas$lpv = -log10(ewas$lpv)
 layout(matrix(1:2, 1), respect=TRUE,)
 plot(ewas[,"beta"], ewas[,"lpv"], main="Volcano plot", pch=".")
@@ -68,9 +68,10 @@ bed = pf[rownames(ewas),c(1:3,5)] # Warning, here pf is global, it must be arg a
 head(bed)
 bed$probes = names(pval)
 bed$pval = pval
-bed$beta = ewas[,"beta"]
-bed = bed[,c(1:3,5,6,7,4)]
-colnames(bed) = c("chrom", "start", "end", "probes", "pval", "beta", "strand")
+bed$beta_C = ewas[,"beta_C"]
+bed$beta_D = ewas[,"beta_D"]
+bed = bed[,c(1:3,5,6,7,8,4)]
+colnames(bed) = c("chrom", "start", "end", "probes", "pval", "beta_C", "beta_D", "strand")
 
 bed = na.omit(bed)
 head(bed)
@@ -182,7 +183,7 @@ new_regions = regions[ rev(order(regions$n_probes)),]
 # chr17:48544347 48582736
 # chr6 31568115 31582465
 # gene = bed_regions[idx_region,]
-#gene = list("chr13", 113158210, 113158673, "PROZ", "1", "+")
+gene = list("chr13", 113158210, 113158673, "PROZ", "1", "+")
 # gene = list("chr11", 816000, 825500, "PNPLA2", "1", "+")
 # gene = list("chr7", 27101178, 27145894, "HOXA", "1", "+")
 # gene = list("chr6", 31559930, 31593095, "TNF", "1", "+")
@@ -192,7 +193,8 @@ new_regions = regions[ rev(order(regions$n_probes)),]
 
 #gene = list("chr6", 33163968, 33164542, "COL11A2", "1", "+")
 #gene = list("chr17", 864061, 864328 , "NXN", "1", "+")
-gene = list("chrX", 103214961, 103215296, "BEX4", "1", "+")
+#gene = list("chrX", 103214961, 103215296, "BEX4", "1", "+")
+#gene = list("chr3", 50230303, 50230828, "GNAI2", "1", "+")
 print(gene)
 pf_meth = probes
 pf_chr_colname = "X.chrom"
@@ -235,41 +237,64 @@ main = gene[[4]]
 image(d[idx_probes,idx_sample], col=cols, breaks=breaks, xaxt="n", yaxt="n", main=main)
 axis(1, (1:nrow(d[idx_probes,idx_sample]) - 1)/(nrow(d[idx_probes,idx_sample]) - 1), rownames(d[idx_probes,idx_sample]), las = 2)
 
-boxplot(d[idx_probes, idx_sample])
 ```
 
 ```{r echo=T, eval=T}
-slk_file = paste0("dmr_", prefix2, ".slk.bed.gz")
-if (file.exists(probes_file)) {
-  slk = read.table(gzfile(slk_file), comment="@", header=TRUE);
-} else {
-  warning(paste0("slk_file ", slk_file, " does not exist. Have to fix it! "))
-  return(NULL)    
-}
 
-slk$beta = bed$beta
-slk = slk[order(slk[,1], slk[,2]),]
-rownames(slk) = rownames(probes)
+DMR = apply(new_regions,1,function(l){
+  chr = l[[1]]
+  st = as.numeric(l[[2]])
+  stop = as.numeric(l[[3]])
+  r1 = subset(bed_ewas, chrom == chr & start >= st & end <= stop)
+  ret = c(
+      min_beta_C = min(r1$beta_C),
+      max_beta_C = max(r1$beta_C),
+      mean_beta_C = mean(r1$beta_C),
+      min_beta_D = min(r1$beta_D),
+      max_beta_D = max(r1$beta_D),
+      mean_beta_D = mean(r1$beta_D)
+  )
+  return(ret)
+})
+DMR = t(DMR)
+new_regions = cbind(new_regions,DMR)
 
-# r1 = subset(slk, X.chrom == "chr6" & start >= 33163968 & end <= 33164542)
-# r2 = subset(slk, X.chrom == "chr13" & start >= 113158210 & end <= 113158673)
-# r3 = subset(slk, X.chrom == "chrX" & start >= 103214961 & end <= 103215296)
 
-#for (i in 1:nrow(new_regions)){
-#  subset(slk, X.chrom == new_regions$X.chrom[i] & start >= new_regions$start[i] & end <= new_regions$end[i])
-#}
-
-r1 = subset(slk, X.chrom == new_regions$X.chrom[1] & start >= new_regions$start[1] & end <= new_regions$end[1])
-r2 = subset(slk, X.chrom == new_regions$X.chrom[3] & start >= new_regions$start[3] & end <= new_regions$end[1])
-r3 = subset(slk, X.chrom == new_regions$X.chrom[6] & start >= new_regions$start[6] & end <= new_regions$end[1])
-
-#combp_subset =  apply_func(slk, 1, function(i){
-#  set = subset(slk, X.chrom == new_regions$X.chrom[i] & start >= new_regions$start[i] & end <= new_regions$end[i])
-#}
-#)
 ```
 
+```{r ggplot, echo=F, eval=T}
+library(reshape2)
+library(ggplot2)
+df = melt(d[idx_probes,idx_sample], id.vars = colnames(d[idx_probes,idx_sample]))
+names(df) = c("probes", "conditions", "value")
+df$conditions = as.factor(df$conditions)
+cond = df$conditions
+levels(cond) = list(C = c("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"), D = c("D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"))
+plot = ggplot(df, aes(x=probes, y=value, color=cond)) + geom_point()
+plot
 
+bed_ewas$beta_C = as.factor(bed_ewas$beta_C)
+bed_ewas$beta_D = as.factor(bed_ewas$beta_D)
+
+ggplot(bed_ewas[idx_probes,], aes(x=probes), color=c(beta_C, beta_D))+geom_point(aes(y=beta_C), colour="red") +geom_point(aes(y=beta_D),  colour="blue")
+
+
+```
+```{r test, eval=T, results="verbatim"}
+idx_C = colnames(d)[17:24]
+idx_D = colnames(d)[25:32]
+don = na.omit(d)
+test = apply_func(don[idx_probes,], 1, function(l){
+  #print(l)
+  data = e[colnames(don),]
+  data$meth = l
+  m_DC = lm(meth~cond, data[c(idx_D, idx_C),])
+  plot(m_DC)
+}
+)
+test = t(test)
+head(test)
+```
 # Session Information
 
 ```{r results="verbatim"}

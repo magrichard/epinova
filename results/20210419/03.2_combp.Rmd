@@ -1,0 +1,145 @@
+---
+title: "Comb-p on EWAS outputs (var)"
+author: "Fabien KON-SUN-TACK"
+date: "5/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Reading `ewas_var`  outputs
+
+
+```{r plot_ewas}
+if (!exists("mreadRDS")) {
+  mreadRDS = memoise::memoise(function(...) {print("reading..."); ret=readRDS(...); print("done."); return(ret)})
+}
+prefix_var = "ewas_var"
+ewas_var = mreadRDS(paste0(prefix, ".rds"))
+head(ewas_var)
+
+ewas_v = ewas_var[,c("beta_DC", "pval_DC")]
+colnames(ewas_v) = c("beta", "lpv")
+ewas_v$lpv = -log10(ewas_v$lpv)
+layout(matrix(1:2, 1), respect=TRUE,)
+plot(ewas_v[,"beta"], ewas_v[,"lpv"], main="Volcano plot", pch=".")
+```
+
+# Export EWAS for `Comb-p`
+
+```{r build_bed}
+range(ewas_v[,"lpv"])
+range(ewas_v[,"beta"])
+#s = mreadRDS("../../data/study_hadaca_epic.rds")
+pf_v = s$platform
+head(ewas_v)
+head(pf_v[,1:6])
+lpval_v = ewas_v[,"lpv"]
+names(lpval_v) = rownames(ewas_v)
+# plot(lpval, main="Manhattan plot", pch=".")
+```
+
+Comb-p does not apreciate p-val lower that $10^{-45}$.
+It produces `nan` values.
+The following code cheats on this point.
+
+```{r}
+layout(matrix(1:2, 1), respect=TRUE)
+plot(density(lpval_v), main="original pval")
+# if (max(lpval)>40) {
+#   lpval = 40*lpval/max(lpval)
+# }
+lpval_v[lpval_v > 30] = (15*(lpval_v[lpval_v>30]-30)/(max(lpval_v)-30))+30
+# lpval[lpval > 40] = 40
+plot(density(lpval_v), main="hacked pval")
+```
+
+```{r}
+pval_v = 10^-lpval_v
+# build and write bed file
+bed_var = pf_v[rownames(ewas_v),c(1:3,5)] # Warning, here pf is global, it must be arg and indexed!!
+head(bed_var)
+bed_var$probes = names(pval_v)
+bed_var$pval = pval_v
+bed_var$beta = ewas_v[,"beta"]
+bed_var = bed_var[,c(1:3,5,6,7,4)]
+colnames(bed_var) = c("chrom", "start", "end", "probes", "pval", "beta", "strand")
+
+bed_var = na.omit(bed_var)
+head(bed_var)
+# write ewas res for combp
+bed_ewas_var_filename = paste0("ewas4combp_", prefix,".bed")
+bed_var[,1] = as.character(bed_var[,1])
+bed_var = bed_var[order(bed_var[,1], bed_var[,2]),]
+write.table(bed_var,file=bed_ewas_var_filename , sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
+# bed = read.table(ewas_filename, sep="\t", header=TRUE)
+```
+
+# Run `Comb-p`
+
+```{r combp}
+pval_tresh_var = 10^-2
+prefix2_var = paste0(prefix_var, "_", pval_tresh_var)
+# Run comb-p, run!!
+cmd_var = "comb-p"
+arg_var = paste0("pipeline -c 5 --seed ", pval_tresh_var, " --dist 1000 -p dmr_", prefix2_var," --region-filter-p 0.05 --region-filter-n 2 ", bed_ewas_var_filename)
+print(paste(cmd_var, arg_var))
+system2(cmd_var, arg_var)
+```
+
+# Results
+
+```{r results, eval=TRUE, results= "hold"}
+# Read comb-p ewas input
+bed_ewas_var = read.table(bed_ewas_var_filename, sep="\t", header=TRUE)
+rownames(bed_ewas_var) = bed_ewas_var$probes
+head(bed_ewas_var)
+dim(bed_ewas_var)
+
+# Read comb-p outputs
+probes_file_var = paste0("dmr_", prefix2_var, ".fdr.bed.gz")
+if (file.exists(probes_file_var)) {
+  probes_var = read.table(gzfile(probes_file_var), comment="@", header=TRUE);
+} else {
+  warning(paste0("probes_file_var ", probes_file_var, " does not exist. Have to fix it! "))
+  return(NULL)    
+}
+head(probes_var)
+dim(probes_var)
+if (sum( paste0(bed_ewas_var[,1], ":", bed_ewas_var[,2], "-", bed_ewas_var[,3]) !=  paste0(probes_var[,1], ":", probes_var[,2], "-", probes_var[,3])) != 0) {
+  stop("Error when namimg probes.")
+}
+rownames(probes_var) = rownames(bed_ewas_var)
+
+regions_file_var = paste0("dmr_", prefix2_var, ".regions-t.bed"   )
+if (file.exists(regions_file_var)) {
+  regions_var = read.table(regions_file_var, comment="@", header=TRUE, stringsAsFactors=FALSE)
+} else {
+  warning(paste0("regions_file_var ", regions_file_var, " does not exist. Have to fix it! "))
+  return(NULL)
+}
+
+rownames(regions_var) = paste0(regions_var[,1], ":", regions_var[,2], "-", regions_var[,3])
+head(regions_var[ rev(order(regions_var$n_probes)),],50)
+bed_regions_var = regions_var
+bed_regions_var[,4] = paste0(bed_regions_var[,1], ":", bed_regions_var[,2], "-", bed_regions_var[,3])
+bed_regions_var[,5] = bed_regions_var[,"z_sidak_p"]
+bed_regions_var[,6] = "+"
+bed_regions_var = bed_regions_var[,1:6]
+colnames(bed_regions_var) = c("chr", "start", "end", "name", "pval", "strand")
+head(bed_regions_var)
+new_regions_var = regions_var[ rev(order(regions_var$n_probes)),]
+
+
+```
+
+
+
+# Session Information
+
+```{r results="verbatim"}
+sessionInfo()
+```
+
