@@ -12,6 +12,7 @@ output:
 
 ```{r, echo=FALSE, eval=TRUE}
 knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+knitr::opts_knit$set(root.dir = 'results/20210419/')
 ```
 
 # Reading `ewas_mean`  outputs
@@ -29,15 +30,16 @@ ewas = ewas_mean[,c("beta_C","beta_D","pval_DC.value")]
 colnames(ewas) = c("beta_C", "beta_D", "lpv")
 ewas$lpv = -log10(ewas$lpv)
 layout(matrix(1:2, 1), respect=TRUE,)
-plot(ewas[,"beta"], ewas[,"lpv"], main="Volcano plot", pch=".")
+plot(ewas[,"beta_C"], ewas[,"lpv"], main="Volcano plot", pch=".")
 ```
 
 # Export EWAS for `Comb-p`
 
 ```{r build_bed}
 range(ewas[,"lpv"])
-range(ewas[,"beta"])
-s = mreadRDS("../../data/study_hadaca_epic.rds")
+range(ewas[,"beta_C"])
+range(ewas[,"beta_D"])
+#s = mreadRDS("../../data/study_hadaca_epic.rds")
 pf = s$platform
 head(ewas)
 head(pf[,1:6])
@@ -268,13 +270,15 @@ library(ggplot2)
 df = melt(d[idx_probes,idx_sample], id.vars = colnames(d[idx_probes,idx_sample]))
 names(df) = c("probes", "conditions", "value")
 df$cond = substr(df$conditions,1,1)
-plot = ggplot(df, aes(x=probes, y=value, color=cond)) + geom_point()
+plot = ggplot(df, aes(x=probes, y=value, color=cond)) + geom_point() + geom_jitter(position=position_jitter(width=0.1,height=0.1))
 plot
 
 boxplot(value~cond+probes,df, las=2,border=c(2,4), ylim=c(0,1))
 
 ```
 ```{r test, eval=T, results="verbatim"}
+apply_func =  apply
+apply_func =  epimedtools::monitored_apply
 idx_C = colnames(d)[17:24]
 idx_D = colnames(d)[25:32]
 don = na.omit(d)

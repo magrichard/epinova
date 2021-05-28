@@ -12,6 +12,7 @@ output:
 
 ```{r, echo=FALSE, eval=TRUE}
 knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+knitr::opts_knit$set(root.dir = 'results/20210419/')
 ```
 
 ```{r loading_data}
@@ -137,8 +138,8 @@ if (!file.exists("ewas_mean.rds")) {
 
     beta_AC =  m_AC$coef[[2]]
     beta_BC =  m_BC$coef[[2]]
-    beta_C =  m_DC$coef[[2]]
-    beta_D = m_DC$coef[[1]]
+    beta_C = m_DC$coef[[2]]
+    beta_D = m_DC$coef[[1]]+m_DC$coef[[2]]
 
     ret <-  c(
       pval_AC = pval_AC,
