@@ -14,7 +14,7 @@ Petit rappel de ce que doit contenir au minimum un rapport de stage de Master :
 <h2>Une intro (règle du 5WH : Who, What, Where, When, Why + How)</h2>
 Vous devez donc expliquer le cadre général de votre stage. Décrivez le sujet en insistant bien sur le contexte (pourquoi c'est un sujet intéressant), les besoins actuels, …
 Gardez à l'esprit que les lecteurs du rapport ne sont pas nécessairement spécialistes, donc il faut que ce soit suffisamment clair et simple (pas simpliste) à comprendre. Une fois cette explication effectuée, il faut annoncer l'objet de votre stage et ce que vous allez raconter dans votre rapport
-<h2>corps de document</h2>
+<h2>Un corps de document</h2>
 Votre stage comporte nécessairement une analyse bibliographique, donc vous détaillez l'état de l'art relatif au domaine de recherche que vous étudiez. Ensuite vous devez montrer les limites de l'état des connaissances actuel et ce qu'il faudrait faire pour repousser ces limites, ce que vous avez fait pendant votre stage et ce que vous pourriez encore faire s'il vous restait du temps..
 <h2>Une conclusion</h2>
 Dans cette dernière partie, vous devez faire une synthèse, montrer comment vos travaux de stage répondent au problème initial, puis mettre en avant les perspectives qui se dégagent de vos travaux.
