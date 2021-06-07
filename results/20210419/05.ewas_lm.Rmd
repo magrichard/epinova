@@ -1,0 +1,304 @@
+---
+title: "Exploring Linear model Parameters"
+author: "Fabien KON-SUN-TACK"
+date: "5/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'results/20210419/')
+```
+
+```{r eval=T, echo=T,  results="verbatim"}
+
+if (!exists("mreadRDS")) {
+  mreadRDS = memoise::memoise(function(...) {print("reading..."); ret=readRDS(...); print("done."); return(ret)})
+}
+s = mreadRDS("../../data/study_hadaca_epic.rds")
+d = s$data
+d = na.omit(d)
+pf = s$platform
+e = s$exp_grp
+head(d)
+head(pf[,1:6])
+table(substr(e$cond,1,4))
+nb_probes = nrow(d)
+```
+
+```{r}
+e$cond
+levels(e$cond)
+levels(e$cond)[levels(e$cond)=="WTws_rep6"] = "C_serum"
+levels(e$cond)[levels(e$cond)=="WTwo_rep6"] = "D_woser"
+e = e[e$cond=="C_serum" | e$cond=="D_woser",]
+e$cond = factor(e$cond)
+e$cond = relevel(e$cond, "C_serum")
+e$cond
+idx_C = colnames(d)[1:8]
+idx_D = colnames(d)[9:16]
+d = d[,c(idx_C,idx_D)]
+head(d)
+```
+
+```{r}
+prefix = "ewas_mean"
+pval_tresh = 10^-2
+prefix2 = paste0(prefix, "_", pval_tresh)
+region_file = paste0("dmr_", prefix2, ".regions.bed.gz"   )
+if (file.exists(region_file)) {
+  region = read.table(gzfile(region_file), comment="@", header=F, stringsAsFactors=FALSE)
+} else {
+  warning(paste0("region_file ", region_file, " does not exist. Have to fix it! "))
+  return(NULL)
+}
+```
+
+```{r}
+apply_func =  apply
+apply_func =  epimedtools::monitored_apply
+if (!file.exists("ewas_mean.rds")) {
+  ewas_mean =  apply_func(d[1:nb_probes,] , 1, function(l) {  
+    # print(l)
+    #l = d[1,]
+    
+    data =  e[colnames(d),]
+    data$meth =  l
+    m_DC =  lm(meth~cond, data)
+    
+    fstat_DC =  summary(m_DC)$fstatistic
+    pval_DC =  1 - pf(fstat_DC[1], fstat_DC[2], fstat_DC[3]) # anova(m_DC)[1,5]
+    
+    beta_C = m_DC$coef[[1]]
+    beta_D = m_DC$coef[[1]]+m_DC$coef[[2]]
+
+    ret <-  c(
+      pval_DC = pval_DC,
+      beta_C = beta_C,
+      beta_D = beta_D,
+      NULL
+    )
+    return(ret)
+    }
+  )
+  ewas_mean = data.frame(t(ewas_mean))
+  head(ewas_mean)
+  saveRDS(ewas_mean, "ewas_mean.rds")
+}
+
+ewas_mean = readRDS("ewas_mean.rds")
+head(ewas_mean)
+print(rownames(ewas_mean)[which(ewas_mean$beta_C == max(ewas_mean$beta_C))])
+```
+
+
+```{r test, eval=T}
+model = apply_func(d[1:nb_probes,],1, function(l){
+  #l = d[rownames(d)[1],]
+  data = e[colnames(d),]
+  data$meth = l
+  m_DC = lm(meth~cond, data)
+  fstat_DC = summary(m_DC)$fstatistic
+  pval_DC =  1 - pf(fstat_DC[1], fstat_DC[2], fstat_DC[3])
+  var_DC = (summary(m_DC)$sigma)**2
+  ret = c(
+    pval = pval_DC,
+    avg_C = m_DC$coef[[1]],
+    avg_D = m_DC$coef[[1]] + m_DC$coef[[2]],
+    sd_C = sd(data[data$cond=="C_serum",]$meth),
+    sd_D = sd(data[data$cond=="D_woser",]$meth),
+    NULL
+  )
+  return(ret)
+}
+)
+results = data.frame(t(model))
+prefix = "ewas_mean"
+bed_ewas_filename = paste0("ewas4combp_", prefix,".bed")
+bed_ewas = read.table(bed_ewas_filename, sep="\t", header=TRUE)
+bed_ewas = cbind(bed_ewas, results)
+head(bed_ewas)
+
+test = apply_func(d[1:20,],1, function(l){
+  l = d[rownames(d)[1],]
+  data = e[colnames(d),]
+  data$meth = l
+  m_DC = lm(meth~cond, data)
+  boxplot(meth~cond, data)
+  abline(h=mean(data[idx_C,3]), col=4)
+  abline(h=mean(data[idx_D,3]), col=2)
+  abline(h=m_DC$coef[[1]], lty=2)
+  abline(h=m_DC$coef[[1]]+m_DC$coef[[2]], lty=3)
+  fstat_DC = summary(m_DC)$fstatistic
+  pval_DC =  1 - pf(fstat_DC[1], fstat_DC[2], fstat_DC[3])
+  coef_DC = m_DC$coef[[1]] + m_DC$coef[[2]]
+  var_DC = (summary(m_DC)$sigma)**2
+  cor.test(coef_DC, var_DC)
+  ret = c(
+    pval = pval_DC,
+    intercept = m_DC$coef[[1]],
+    coef = m_DC$coef[[1]] + m_DC$coef[[2]],
+    var = var_DC,
+    NULL
+  )
+  return(ret)
+}
+)
+
+res = data.frame(t(test))
+res
+```
+# To do pour Mercredi
+
+Régions d'intérêt:
+1. Variation de variance / ø variation de moyenne
+1. Variation de moyenne --> valeur de variance (pour C) => corrélation (variation de moyenne, valeur de variance)
+
+```{r}
+if (!file.exists("ewas_var.rds")) {
+  ewas_var <- apply_func(d[1:nb_probes,] , 1, function(l) {  
+    # print(l)
+    #l = d[rownames(d)[1],]
+    
+    vtest_DC = var.test(l[idx_D],l[idx_C])
+    pval_DC = vtest_DC$p.value 
+    beta_DC = log2(vtest_DC$estimate[[1]])
+  
+    ret = c(
+      pval_DC = pval_DC,
+      beta_DC = beta_DC,
+      NULL
+    )
+    return(ret)
+    }
+  )
+  ewas_var = data.frame(t(ewas_var))
+  head(ewas_var)
+  saveRDS(ewas_var, "ewas_var.rds")
+ }
+ ewas_var = readRDS("ewas_var.rds")
+```
+
+```{r}
+DMR = apply_func(new_regions, 1, function(l){
+  #l = new_regions[1,]
+  chr = l[[1]]
+  st = as.numeric(l[[2]])
+  stop = as.numeric(l[[3]])
+  r1 = subset(bed_ewas, chrom == chr & start >= st & end <= stop)
+  ret = c(
+      min_beta_C = min(r1$intercept),
+      max_beta_C = max(r1$intercept),
+      mean_beta_C = mean(r1$intercept),
+      var_C = var(r1$intercept),
+      varia_C = mean(r1$var),
+      min_beta_D = min(r1$coef),
+      max_beta_D = max(r1$coef),
+      mean_beta_D = mean(r1$coef),
+      var_D = var(r1$coef),
+      NULL
+  )
+  return(ret)
+})
+DMR = t(DMR)
+new_regions = cbind(new_regions,DMR)
+new_regions = new_regions[ rev(order(new_regions$n_probes)),]
+```
+
+```{r plotting comb-p}
+plot_combp_res = function (rois, ewas, combp_res_probes, legendplace="topright") {
+  id_probes = ewas[as.character(ewas[,1])==as.character(rois[,1]) & ewas[,2]>=rois[,2] & ewas[,2]<=rois[,3],4]
+  sub_ewas = ewas[ewas[,4]%in%id_probes, ]
+  
+  pval_ewas = combp_res_probes[paste0(combp_res_probes[,1], ":", combp_res_probes[,2]) %in% paste0(sub_ewas[,1], ":", sub_ewas[,2]),]$p
+  pval_slk =  combp_res_probes[paste0(combp_res_probes[,1], ":", combp_res_probes[,2]) %in% paste0(sub_ewas[,1], ":", sub_ewas[,2]),]$region.p
+  qval_slk =  combp_res_probes[paste0(combp_res_probes[,1], ":", combp_res_probes[,2]) %in% paste0(sub_ewas[,1], ":", sub_ewas[,2]),]$region.q 
+
+  pval_ewas[pval_ewas==0] = 10^-45
+  pval_slk [pval_slk ==0] = 10^-45
+  qval_slk [qval_slk ==0] = 10^-45 
+
+  # plot
+  layout(matrix(c(2,1,1,1,1), 1))
+  x = 1:length(-log10(pval_ewas))
+  plot(x, -log10(pval_ewas), col="red", xaxt="n", 
+    xlab="", ylab="-log10(p-values)", 
+    ylim=c(0, min(45, max(-log10(pval_slk), -log10(pval_ewas)))), 
+    type="l", lty=3
+  )
+  title(main=paste0(rois[[1]], ":", rois[[2]], ":", rois[[3]]), adj=0, line=-1)
+  axis(1, at=x, labels=sub_ewas$probes,las=2, cex.axis = 0.5, cex.axis = 0.5)
+  lines(-log10(pval_slk), col="blue"  , type="l", lty=3)
+  lines(-log10(qval_slk), col="purple", type="l", lty=3) 
+
+  # # add Student pvals
+  # if (length(gene_symbols)>1) {
+  #   for (g in gene_symbols) {
+  #     lines(sub_ewas[,paste0("lpval_student_", g)], col=pals::glasbey()[which(gene_symbols%in%g)], type="l")
+  #   }
+  # }
+  # add DMR
+  abline(h=-log10(as.numeric(pval_tresh)), col="black", lwd=1, lty=2)
+  for (i in 1:nrow(combp_res_region)) {
+    x1 = c(which(sub_ewas[,2] >= combp_res_region[i,2]), which(sub_ewas[,3] <= combp_res_region[i,3]))
+    y1 = rep(-log10(as.numeric(pval_tresh)), length(x1))
+    lines(x1,y1, type="o", col="green", pch=18, lwd=4)
+  }
+  # add legend
+  col = c("red","blue", "purple", "black", "green")
+  lwd = c(1,1,1,1,4)
+  lty = c(3,3,3,2,1)
+  legend=c("pval Fisher", "pval SLK", "qval SLK",  "threshold", "DMR")
+  legendplace="topright"
+  legend(legendplace, legend=legend, col=col, lwd=lwd, lty=lty)  
+  par(mar=c(0,0,0,0), mgp=c(3, 1, 0), las=0)
+  plot.new()
+  par(mar=c(0,0,0,0), mgp=c(3, 1, 0), las=0)
+  par(mar=c(5.1, 4.1, 4.1, 2.1), mgp=c(3, 1, 0), las=0)
+  # if (length(gene_symbols)>1) {
+  #   col   = c(pals::glasbey()[1:length(gene_symbols)])
+  #   lwd   = c(rep(1, length(gene_symbols)))
+  #   lty   = c(rep(1, length(gene_symbols)))
+  #   legend= c(paste0("pval Student ", gene_symbols))
+  #   legend("top", legend=legend, col=col, lwd=lwd, lty=lty, bty="n")
+  # }
+  par(mar=c(5.1, 4.1, 4.1, 2.1), mgp=c(3, 1, 0), las=0)
+  # return(mdata)
+}
+
+# reading combp outputs
+ewas = read.table(paste0("ewas4combp_", prefix, ".bed"), header=TRUE)
+combp_res_probes = read.table(gzfile(paste0("dmr_", prefix2, ".fdr.bed.gz")), comment="@", header=TRUE)
+combp_res_region = read.table(paste0("dmr_", prefix2, ".regions-t.bed"), comment="@", header=TRUE)
+# select region of interest
+rois = combp_res_region[order(-combp_res_region$n_probes, combp_res_region$z_sidak_p),]
+# plot them
+for (i in 1:min(6, nrow(rois))) {
+  plot_combp_res(rois, ewas, combp_res_probes)
+}
+
+
+```
+
+```{r ggplot, echo=F, eval=T}
+library(reshape2)
+library(ggplot2)
+df = melt(bed_ewas[idx_probes,], id.vars = colnames(bed_ewas))
+df = df[,c(2,4,9:13)]
+df$cond_C = "C"
+df$cond_D = "D"
+pos = position_dodge(0.4)
+plot = ggplot(df, aes(x=start)) + geom_point(aes(y=avg_C), color= "red", position = pos) + geom_point(aes(y=avg_D), position = pos, color = "blue") + geom_errorbar(aes(ymin=avg_C-sd_C, ymax=avg_C+sd_C), color="red", position = pos) + geom_errorbar(aes(ymin=avg_D-sd_D, ymax=avg_D+sd_D), color="blue", position = pos) + geom_jitter(aes(y=avg_C), position=position_jitter(width=2.0)) + geom_jitter(aes(y=avg_C), position=position_jitter(width=2.0))
+plot
+
+
+```
+
+
+
+
+# Session Information
+
+```{r results="verbatim"}
+sessionInfo()
+```
