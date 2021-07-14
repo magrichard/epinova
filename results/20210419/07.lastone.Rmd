@@ -13,7 +13,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(Hmisc)
-library(lattice)
+library(qqman)
 library(epimedtools)
 apply_func =  apply
 apply_func =  epimedtools::monitored_apply
@@ -28,30 +28,25 @@ if (!exists("mreadRDS")) {
   mreadRDS = memoise::memoise(function(...) {print("reading..."); ret=readRDS(...); print("done."); return(ret)})
 }
 s = mreadRDS("../../data/study_hadaca_epic.rds")
-d = s$data
-# sum(is.na(d))
-# dim(d)
-#d = na.omit(d)
-# dim(d)
-# sum(is.na(d))
+data = s$data
 e = s$exp_grp
 pf = s$platform
 replicates = c("C1","C2","C3","C4","C5","C6","C7","C8","D1","D2","D3","D4","D5","D6","D7","D8")
-nb_probes = nrow(d)
-bed_ewas_florent = read.table("test/ewas4combp_study_hadaca_meth_raw.rds_model01.bed",comment="@",sep="\t",header=T)
+
+bed_ewas_florent = read.table("data_florent/ewas4combp_study_hadaca_meth_raw.rds_model01.bed",comment="@",sep="\t",header=T)
 ```
 
 ```{r data}
-idx_C = colnames(d)[17:24]
-idx_D = colnames(d)[25:32]
+idx_C = colnames(data)[17:24]
+idx_D = colnames(data)[25:32]
 levels(e$cond)[levels(e$cond)=="WTws_rep6"] = "C_serum"
 levels(e$cond)[levels(e$cond)=="WTwo_rep6"] = "D_woser"
-d = d[,c(idx_C,idx_D)]
+data = data[,c(idx_C,idx_D)]
 e = e[e$cond=="C_serum"|e$cond=="D_woser",]
 e$cond = factor(e$cond,levels=c("C_serum","D_woser"))
 rownames(bed_ewas_florent) = bed_ewas_florent$probes
-d = d[rownames(d) %in% rownames(bed_ewas_florent),]
-
+data = data[rownames(data) %in% rownames(bed_ewas_florent),]
+nb_probes = nrow(data)
 # testing
 tmp_probes = c("cg21020221",  "cg06619462", "cg18748898")
 
@@ -61,13 +56,13 @@ tmp_probes = c("cg21020221",  "cg06619462", "cg18748898")
 
 ```{r ewas_mean, echo=F, eval=TRUE, results="verbatim"}
 if (!file.exists(paste0(prefix,"_DC",".rds"))) {
-  ewas_mean_DC =  apply_func(d[1:nb_probes,] , 1, function(l) {  
+  ewas_mean_DC =  apply_func(data[1:nb_probes,] , 1, function(l) {  
     # print(l)
-    # l = d[1,]
+    # l = dt[1,]
     
-    data =  e[colnames(d),]
-    data$meth =  l
-    m_DC =  lm(meth~cond, data[c(idx_D, idx_C),])
+    dt =  e[colnames(data),]
+    dt$meth =  l
+    m_DC =  lm(meth~cond, dt[c(idx_D, idx_C),])
     
     fstat_DC =  summary(m_DC)$fstatistic
 
@@ -98,62 +93,52 @@ if (!file.exists(paste0(prefix,"_DC",".rds"))) {
 
 ewas_mean_DC = mreadRDS(paste0(prefix,"_DC",".rds"))
 head(ewas_mean_DC)
-#ewas_mean[tmp_probes,]
+ewas_mean_DC[tmp_probes,]
 ```
 
 ## EWAS_var
 
 ```{r ewas_var, echo=TRUE, eval=TRUE, results="verbatim"}
-data =na.omit(d)
-#data = d
-n_probes=nrow(data)
-if (!file.exists("ewas_var.rds")) {
-  ewas_var <- apply_func(data[1:n_probes,] , 1, function(l) {  
+v_data =na.omit(data)
+nv_probes=nrow(v_data)
+if (!file.exists(paste0(prefix_var,"_DC",".rds"))) {
+  ewas_var_DC <- apply_func(v_data[1:nv_probes,] , 1, function(l) {  
     # print(l)
-    # l = d[1,]
-    # vtest_AC = var.test(meth~cond,data[c(idx_A,idx_C),])
-    # vtest_BC = var.test(meth~cond,data[c(idx_B,idx_C),])
-    # vtest_DC = var.test(meth~cond,data[c(idx_D,idx_C),])
+
     vtest_DC = var.test(l[idx_D],l[idx_C])
-    # vtest_AC = aov(meth~cond,data[c(idx_A,idx_C),])
-    # vtest_BC = aov(meth~cond,data[c(idx_B,idx_C),])
-    # vtest_DC = aov(meth~cond,data[c(idx_D,idx_C),])
     pval_DC = vtest_DC$p.value
-    # pval_AC = anova(vtest_AC)[1,5]
-    # pval_BC = anova(vtest_BC)[1,5] 
-    # pval_DC = anova(vtest_DC)[1,5]
-    beta_CD = vtest_DC$estimate[[1]]
+    beta_DC = vtest_DC$estimate[[1]]
 
     ret = c(
       pval_DC = pval_DC,
-      beta_CD = beta_CD,
+      beta_DC = beta_DC,
       NULL
     )
     return(ret)
     }
   )
-  ewas_var = data.frame(t(ewas_var))
-  head(ewas_var)
-  saveRDS(ewas_var, "ewas_var.rds")
+  ewas_var_DC = data.frame(t(ewas_var_DC))
+  head(ewas_var_DC)
+  saveRDS(ewas_var_DC, paste0(prefix_var,"_DC",".rds"))
  }
- ewas_var = mreadRDS("ewas_var.rds")
- ewas_var[tmp_probes,]
+ ewas_var_DC = mreadRDS(paste0(prefix_var,"_DC",".rds"))
+ ewas_var_DC[tmp_probes,]
 ```
 # Comb-P
 
 ## Preparing Data
 ```{r preparing data}
 # Mean
-colnames(ewas_mean) = c("lpv","beta_C", "beta_D","sd_C","sd_D")
-ewas_mean$lpv = -log10(ewas_mean$lpv)
-lpval = ewas_mean[,"lpv"]
-names(lpval) = rownames(ewas_mean)
+colnames(ewas_mean_DC) = c("lpv","beta_C", "beta_D","sd_C","sd_D")
+ewas_mean_DC$lpv = -log10(ewas_mean_DC$lpv)
+lpval = ewas_mean_DC[,"lpv"]
+names(lpval) = rownames(ewas_mean_DC)
 
 #Variance
-colnames(ewas_var) = c("lpv","beta")
-ewas_var$lpv = -log10(ewas_var$lpv)
-lpval_var = ewas_var[,"lpv"]
-names(lpval_var) = rownames(ewas_var)
+colnames(ewas_var_DC) = c("lpv","beta")
+ewas_var_DC$lpv = -log10(ewas_var_DC$lpv)
+lpval_var = ewas_var_DC[,"lpv"]
+names(lpval_var) = rownames(ewas_var_DC)
 
 ```
 
@@ -161,43 +146,41 @@ names(lpval_var) = rownames(ewas_var)
 ## Mean bed file
 pval = 10^-lpval
 # build and write bed file
-bed = pf[rownames(ewas_mean),c(1:3,5)] # Warning, here pf is global, it must be arg and indexed!!
-head(bed)
-bed$probes = names(pval)
-bed$pval = pval
-bed$beta_C = ewas_mean[,"beta_C"]
-bed$beta_D = ewas_mean[,"beta_D"]
-bed$sd_C = ewas_mean[,"sd_C"]
-bed$sd_D = ewas_mean[,"sd_D"]
-bed = cbind(bed,d[,c(idx_C,idx_D)])
-bed = bed[,c(1:3,5:10,4,11:26)]
-colnames(bed)[1] = "chrom"
+bed_mean = pf[rownames(ewas_mean_DC),c(1:3,5)] # Warning, here pf is global, it must be arg and indexed!!
+head(bed_mean)
+bed_mean$probes = names(pval)
+bed_mean$pval = pval
+bed_mean$beta_C = ewas_mean_DC[,"beta_C"]
+bed_mean$beta_D = ewas_mean_DC[,"beta_D"]
+bed_mean$sd_C = ewas_mean_DC[,"sd_C"]
+bed_mean$sd_D = ewas_mean_DC[,"sd_D"]
+bed_mean = cbind(bed_mean,data[,c(idx_C,idx_D)])
+bed_mean = bed[,c(1:3,5:10,4,11:26)]
+colnames(bed_mean)[1] = "chrom"
 
-#bed = na.omit(bed)
 head(bed)
 # write ewas res for combp
 bed_ewas_filename = paste0("ewas4combp_", prefix,".bed")
-bed[,1] = as.character(bed[,1])
-bed = bed[order(bed[,1], bed[,2]),]
-write.table(bed,file=bed_ewas_filename , sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
+bed_mean[,1] = as.character(bed_mean[,1])
+bed_mean = bed_mean[order(bed_mean[,1], bed_mean[,2]),]
+write.table(bed_mean,file=bed_ewas_filename , sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
 
 ## Variance bed file
 pval_var = 10^-lpval_var
 # build and write bed file
-bed_var = pf[rownames(ewas_var),c(1:3,5)] # Warning, here pf is global, it must be arg and indexed!!
+bed_var = pf[rownames(ewas_var_DC),c(1:3,5)] # Warning, here pf is global, it must be arg and indexed!!
 head(bed_var)
 bed_var$probes = names(pval_var)
 bed_var$pval = pval_var
-bed_var$beta = ewas_var[,"beta"]
-bed_var = cbind(bed_var,data[,c(idx_C,idx_D)])
+bed_var$beta = ewas_var_DC[,"beta"]
+bed_var = cbind(bed_var,v_data[,c(idx_C,idx_D)])
 bed_var = bed_var[,c(1:3,5:7,4,8:23)]
 
 colnames(bed_var)[1] = "chrom"
 
-#bed_var = na.omit(bed_var)
 head(bed_var)
 # write ewas res for combp
-bed_ewas_var_filename = paste0("ewas4combp_", prefix_var,"_florent",".bed")
+bed_ewas_var_filename = paste0("ewas4combp_", prefix_var,".bed")
 bed_var[,1] = as.character(bed_var[,1])
 bed_var = bed_var[order(bed_var[,1], bed_var[,2]),]
 write.table(bed_var,file=bed_ewas_var_filename , sep="\t", quote=FALSE, row.names=FALSE, col.names=TRUE)
@@ -208,7 +191,7 @@ write.table(bed_var,file=bed_ewas_var_filename , sep="\t", quote=FALSE, row.name
 ## Run Comb-P
 ```{r combp}
 pval_tresh = 10^-3
-prefix2 = paste0(prefix, "_", pval_tresh,".fabien")
+prefix2 = paste0(prefix, "_", pval_tresh)
 # # Run comb-p, run!!
 cmd = "comb-p"
 arg = paste0("pipeline -c 5 --seed ", pval_tresh, " --dist 1000 -p dmr_", prefix2," --region-filter-p 0.05 --region-filter-n 2 ", bed_ewas_filename)
@@ -218,10 +201,10 @@ system2(cmd, arg)
 pval_tresh_var = 10^-2
 prefix2_var = paste0(prefix_var, "_", pval_tresh_var)
 # # Run comb-p, run!!
-# cmd_var = "comb-p"
-# arg_var = paste0("pipeline -c 5 --seed ", pval_tresh_var, " --dist 1000 -p dmr_", prefix2_var," --region-filter-p 0.05 --region-filter-n 2 ", bed_ewas_var_filename)
-# print(paste(cmd_var, arg_var))
-# system2(cmd_var, arg_var)
+cmd_var = "comb-p"
+arg_var = paste0("pipeline -c 5 --seed ", pval_tresh_var, " --dist 1000 -p dmr_", prefix2_var," --region-filter-p 0.05 --region-filter-n 2 ", bed_ewas_var_filename)
+print(paste(cmd_var, arg_var))
+system2(cmd_var, arg_var)
 
 ```
 
@@ -229,46 +212,44 @@ prefix2_var = paste0(prefix_var, "_", pval_tresh_var)
 
 ```{r results, eval=TRUE, results= "hold"}
 # Read comb-p ewas input
-bed_ewas = read.table(bed_ewas_filename, sep="\t",comment="@", header=TRUE)
-#bed_ewas = read.table("test/ewas4combp_study_hadaca_meth_raw.rds_model01.bed",comment="@",sep="\t",header=T)
-rownames(bed_ewas) = bed_ewas$probes
-head(bed_ewas)
-dim(bed_ewas)
+bed_ewas_mean = read.table(bed_ewas_filename, sep="\t",comment="@", header=TRUE)
+rownames(bed_ewas_mean) = bed_ewas_mean$probes
+head(bed_ewas_mean)
+dim(bed_ewas_mean)
 
 # Read comb-p outputs
-probes_file = paste0("dmr_", prefix2, ".fdr.bed.gz")
-if (file.exists(probes_file)) {
-  probes = read.table(gzfile(probes_file), comment="@", header=TRUE);
+probes_file_mean = paste0("dmr_", prefix2, ".fdr.bed.gz")
+if (file.exists(probes_file_mean)) {
+  probes_mean = read.table(gzfile(probes_file_mean), comment="@", header=TRUE);
 } else {
-  warning(paste0("probes_file ", probes_file, " does not exist. Have to fix it! "))
+  warning(paste0("probes_file_mean ", probes_file_mean, " does not exist. Have to fix it! "))
   return(NULL)    
 }
-head(probes)
-dim(probes)
-if (sum( paste0(bed_ewas[,1], ":", bed_ewas[,2], "-", bed_ewas[,3]) !=  paste0(probes[,1], ":", probes[,2], "-", probes[,3])) != 0) {
+head(probes_mean)
+dim(probes_mean)
+if (sum( paste0(bed_ewas_mean[,1], ":", bed_ewas_mean[,2], "-", bed_ewas_mean[,3]) !=  paste0(probes_mean[,1], ":", probes_mean[,2], "-", probes_mean[,3])) != 0) {
   stop("Error when namimg probes.")
 }
-rownames(probes) = rownames(bed_ewas)
+rownames(probes_mean) = rownames(bed_ewas_mean)
 
-regions_file = paste0("dmr_", prefix2, ".regions-t.bed"   )
-if (file.exists(regions_file)) {
-  regions = read.table(regions_file, comment="@", header=TRUE, stringsAsFactors=FALSE)
+regions_file_mean = paste0("dmr_", prefix2, ".regions-t.bed"   )
+if (file.exists(regions_file_mean)) {
+  regions_mean = read.table(regions_file_mean, comment="@", header=TRUE, stringsAsFactors=FALSE)
 } else {
-  warning(paste0("regions_file ", regions_file, " does not exist. Have to fix it! "))
+  warning(paste0("regions_file_mean ", regions_file_mean, " does not exist. Have to fix it! "))
   return(NULL)
 }
 
-rownames(regions) = paste0(regions[,1], ":", regions[,2], "-", regions[,3])
-head(regions[ rev(order(regions$n_probes)),],50)
-bed_regions = regions
-bed_regions[,4] = paste0(bed_regions[,1], ":", bed_regions[,2], "-", bed_regions[,3])
-bed_regions[,5] = bed_regions[,"z_sidak_p"]
-bed_regions[,6] = "+"
-bed_regions = bed_regions[,1:6]
-colnames(bed_regions) = c("chr", "start", "end", "name", "pval", "strand")
-head(bed_regions)
-new_regions = regions[ rev(order(regions$n_probes)),]
-new_regions
+rownames(regions_mean) = paste0(regions_mean[,1], ":", regions_mean[,2], "-", regions_mean[,3])
+bed_regions_mean = regions_mean
+bed_regions_mean[,4] = paste0(bed_regions_mean[,1], ":", bed_regions_mean[,2], "-", bed_regions_mean[,3])
+bed_regions_mean[,5] = bed_regions_mean[,"z_sidak_p"]
+bed_regions_mean[,6] = "+"
+bed_regions_mean = bed_regions_mean[,1:6]
+colnames(bed_regions_mean) = c("chr", "start", "end", "name", "pval", "strand")
+head(bed_regions_mean)
+new_regions_mean = regions_mean[ rev(order(regions_mean$n_probes)),]
+new_regions_mean
 
 # Read comb-p ewas input
 bed_ewas_var = read.table(bed_ewas_var_filename, sep="\t", header=TRUE)
@@ -300,7 +281,6 @@ if (file.exists(regions_file_var)) {
 }
 
 rownames(regions_var) = paste0(regions_var[,1], ":", regions_var[,2], "-", regions_var[,3])
-head(regions_var[ rev(order(regions_var$n_probes)),],50)
 bed_regions_var = regions_var
 bed_regions_var[,4] = paste0(bed_regions_var[,1], ":", bed_regions_var[,2], "-", bed_regions_var[,3])
 bed_regions_var[,5] = bed_regions_var[,"z_sidak_p"]
@@ -314,11 +294,11 @@ new_regions_var
 ```
 
 ```{r lm parameters}
-DMR = apply_func(new_regions,1,function(l){
+DMR_mean = apply_func(new_regions_mean,1,function(l){
   chr = l[[1]]
   st = as.numeric(l[[2]])
   stop = as.numeric(l[[3]])
-  r1 = subset(bed_ewas, chrom == chr & start >= st & end <= stop)
+  r1 = subset(bed_ewas_mean, chrom == chr & start >= st & end <= stop)
   ret = c(
       min_beta_C = min(r1$beta_C),
       max_beta_C = max(r1$beta_C),
@@ -329,20 +309,20 @@ DMR = apply_func(new_regions,1,function(l){
   )
   return(ret)
 })
-DMR = t(DMR)
-new_regions = cbind(new_regions,DMR)
-head(new_regions)
+DMR_mean = t(DMR_mean)
+new_regions_mean = cbind(new_regions_mean,DMR_mean)
+head(new_regions_mean)
 
 # Viewing lm parameters
 test_probes = 3
-test = apply_func(d[1:test_probes,c(idx_C,idx_D)],1, function(l){
-  #l = d[rownames(d)[1],]
-  data = e[colnames(d),]
-  data$meth = l
-  m_DC = lm(meth~cond, data[c(idx_C,idx_D),])
-  boxplot(meth~cond, data[c(idx_C,idx_D),])
-  abline(h=mean(data[idx_C,3]), col=4)
-  abline(h=mean(data[idx_D,3]), col=2)
+test = apply_func(data[1:test_probes,c(idx_C,idx_D)],1, function(l){
+  #l = d[rownames(data)[1],]
+  dt = e[colnames(data),]
+  dt$meth = l
+  m_DC = lm(meth~cond, dt[c(idx_C,idx_D),])
+  boxplot(meth~cond, dt[c(idx_C,idx_D),])
+  abline(h=mean(dt[idx_C,3]), col=4)
+  abline(h=mean(dt[idx_D,3]), col=2)
   abline(h=m_DC$coef[[1]], lty=2)
   abline(h=m_DC$coef[[1]]+m_DC$coef[[2]], lty=3)
 }
@@ -366,8 +346,6 @@ DMR_var = t(DMR_var)
 new_regions_var = cbind(new_regions_var,DMR_var)
 new_regions_var = new_regions_var[ rev(order(new_regions_var$n_probes)),]
 new_regions_var
-
-
 
 ```
 
@@ -486,7 +464,9 @@ plot_combp_res_var = function (rois_var, ewas, combp_res_probes_var, legendplace
   # par(mar=c(5.1, 4.1, 4.1, 2.1), mgp=c(3, 1, 0), las=0)
   # # return(mdata)
 }
+```
 
+```{r}
 # reading combp outputs
 ## Mean outputs
 ewas = read.table(paste0("ewas4combp_", prefix, ".bed"), comment="@",header=TRUE) 
@@ -494,7 +474,7 @@ combp_res_probes = read.table(gzfile(paste0("dmr_", prefix2, ".fdr.bed.gz")), co
 combp_res_region = read.table(paste0("dmr_", prefix2, ".regions-t.bed"), comment="@", header=TRUE)
 
 ## Variance outputs
-ewas_var = read.table(paste0("ewas4combp_", prefix_var,"_florent", ".bed"), comment="@",header=TRUE) ## variance outputs (V)
+ewas_var = read.table(paste0("ewas4combp_", prefix_var, ".bed"), comment="@",header=TRUE) ## variance outputs (V)
 combp_res_probes_var = read.table(gzfile(paste0("dmr_", prefix2_var, ".fdr.bed.gz")), comment="@", header=TRUE)
 combp_res_region_var = read.table(paste0("dmr_", prefix2_var, ".regions-t.bed"), comment="@", header=TRUE)
 
@@ -563,9 +543,8 @@ for (i in 1:nrow(rois)){
   ed = as.numeric(rois[i,3])
   r1 = subset(ewas,chrom == chr & start >= st & end <= ed)
   idx_probes = r1$probes
+  
   df = r1
-  #df = melt(bed_ewas[rownames(r1),], id.vars=colnames(bed_ewas))
-  #df=df[,c("start", "probes","beta_C","beta_D","sd_C","sd_D",replicates)]
   df= pivot_longer(df,cols=replicates, names_to="condition",values_to="meth_value")
   df = pivot_longer(df, cols=c("beta_C", "beta_D"), names_to="mean", values_to = "mean_value")
   df = pivot_longer(df, cols=c("sd_C", "sd_D"), names_to="sd", values_to = "sd_value")
@@ -573,9 +552,11 @@ for (i in 1:nrow(rois)){
   df = df[order(df$cond),]
   df = data.frame(df)
   #print(df)
+  
   cd_C = df[substr(df[,colnames(df)=="condition"],1,1)=="C"&df$cond=="C"&df$mean=="beta_C"&df$sd=="sd_C",]
   cd_D = df[substr(df[,colnames(df)=="condition"],1,1)=="D"&df$cond=="D"&df$mean=="beta_D"&df$sd=="sd_D",]
   concat = rbind(cd_C,cd_D)
+  
   pdf_path = paste0("pdf_files/EWAS_mean",i,".pdf")
   pdf(file=pdf_path)
   par(mfrow=c(2,3))
@@ -586,8 +567,7 @@ for (i in 1:nrow(rois)){
   axis(1, (1:nrow(d[idx_probes,idx_sample]) - 1)/(nrow(d[idx_probes,idx_sample]) - 1), rownames(d[idx_probes,idx_sample]), las = 2)
   plot_combp_res(rois[i,],ewas,combp_res_probes)
   boxplot(meth_value~cond+probes,concat,las=2,border=c(2,4),ylim=c(0,1))
-  #p1 = ggplot(concat, aes(x=start, y=mean_value, color=cond)) + geom_point() + geom_errorbar(aes(ymin=mean_value-sd_value, ymax=mean_value+sd_value))
-  #print(p1)
+
   concat$cond = as.factor(concat$cond)
   errbar(concat$start,concat$mean_value,concat$mean_value+concat$sd_value,concat$mean_value-concat$sd_value,col=c(2,4)[concat$cond],errbar.col=c(2,4)[concat$cond],xlab = "start",ylab = "meth_value")
   dev.off()
@@ -600,9 +580,8 @@ for (i in 1:nrow(rois_var)){
   ed = as.numeric(rois_var[i,3])
   r1 = subset(ewas,chrom == chr & start >= st & end <= ed)
   idx_probes = r1$probes
+  
   df = r1
-  #df = melt(bed_ewas[rownames(r1),], id.vars=colnames(bed_ewas))
-  #df=df[,c("start", "probes","beta_C","beta_D","sd_C","sd_D",replicates)]
   df= pivot_longer(df,cols=replicates, names_to="condition",values_to="meth_value")
   df = pivot_longer(df, cols=c("beta_C", "beta_D"), names_to="mean", values_to = "mean_value")
   df = pivot_longer(df, cols=c("sd_C", "sd_D"), names_to="sd", values_to = "sd_value")
@@ -610,9 +589,11 @@ for (i in 1:nrow(rois_var)){
   df = df[order(df$cond),]
   df = data.frame(df)
   #print(df)
+  
   cd_C = df[substr(df[,colnames(df)=="condition"],1,1)=="C"&df$cond=="C"&df$mean=="beta_C"&df$sd=="sd_C",]
   cd_D = df[substr(df[,colnames(df)=="condition"],1,1)=="D"&df$cond=="D"&df$mean=="beta_D"&df$sd=="sd_D",]
   concat = rbind(cd_C,cd_D)
+  
   pdf_path = paste0("pdf_files/EWAS_var",i,".pdf")
   pdf(file=pdf_path)
   par(mfrow=c(2,3))
@@ -623,8 +604,7 @@ for (i in 1:nrow(rois_var)){
   axis(1, (1:nrow(d[idx_probes,idx_sample]) - 1)/(nrow(d[idx_probes,idx_sample]) - 1), rownames(d[idx_probes,idx_sample]), las = 2)
   plot_combp_res_var(rois_var[i,],ewas,combp_res_probes_var)
   boxplot(meth_value~cond+probes,concat,las=2,border=c(2,4),ylim=c(0,1))
-  #p1 = ggplot(concat, aes(x=start, y=mean_value, color=cond)) + geom_point() + geom_errorbar(aes(ymin=mean_value-sd_value, ymax=mean_value+sd_value))
-  #print(p1)
+
   concat$cond = as.factor(concat$cond)
   errbar(concat$start,concat$mean_value,concat$mean_value+concat$sd_value,concat$mean_value-concat$sd_value,col=c(2,4)[concat$cond],errbar.col=c(2,4)[concat$cond],xlab = "start",ylab = "meth_value")
   dev.off()
@@ -632,86 +612,42 @@ for (i in 1:nrow(rois_var)){
 
 ```
 
-```{r plotting loop}
-for (i in 1:nrow(rois_var)){
-  chr = rois_var[i,1]
-  st = as.numeric(rois_var[i,2])
-  ed = as.numeric(rois_var[i,3])
-  r1 = subset(ewas,chrom == chr & start >= st & end <= ed)
-  idx_probes = r1$probes
-  df = r1
-  #df = melt(bed_ewas[rownames(r1),], id.vars=colnames(bed_ewas))
-  #df=df[,c("start", "probes","beta_C","beta_D","sd_C","sd_D",replicates)]
-  df= pivot_longer(df,cols=replicates, names_to="condition",values_to="meth_value")
-  df = pivot_longer(df, cols=c("beta_C", "beta_D"), names_to="mean", values_to = "mean_value")
-  df = pivot_longer(df, cols=c("sd_C", "sd_D"), names_to="sd", values_to = "sd_value")
-  df$cond=substr(df$mean, 6, 6)
-  df = df[order(df$cond),]
-  df = data.frame(df)
-  #print(df)
-  cd_C = df[substr(df[,colnames(df)=="condition"],1,1)=="C"&df$cond=="C"&df$mean=="beta_C"&df$sd=="sd_C",]
-  cd_D = df[substr(df[,colnames(df)=="condition"],1,1)=="D"&df$cond=="D"&df$mean=="beta_D"&df$sd=="sd_D",]
-  concat = rbind(cd_C,cd_D)
-  #layout(matrix(1:4,2))
-  #par(mfrow=c(2,2))
-  #image(d[idx_probes,idx_sample], col=cols, breaks=breaks, xaxt="n", yaxt="n",ylab="Methylation value between \n C (bottom) and D (top)",cex.lab=0.75)
-  #segments(-1,0.5,2,0.5,lwd=2)
-  #axis(1, (1:nrow(d[idx_probes,idx_sample]) - 1)/(nrow(d[idx_probes,idx_sample]) - 1), rownames(d[idx_probes,idx_sample]), las = 2)
-  #plot_combp_res_var(rois_var[i,],ewas,combp_res_probes_var)
-  #boxplot(meth_value~cond+probes,concat,las=2,border=c(2,4),ylim=c(0,1))
-  #p1 = ggplot(concat, aes(x=start, y=mean_value, color=cond)) + geom_point() + geom_errorbar(aes(ymin=mean_value-sd_value, ymax=mean_value+sd_value))
-  #print(p1)
-  concat$cond = as.factor(concat$cond)
-  #errbar(concat$start,concat$mean_value,concat$mean_value+concat$sd_value,concat$mean_value-concat$sd_value,col=c(2,4)[concat$cond],errbar.col=c(2,4)[concat$cond],xlab = "start",ylab = "meth_value")
-  concat[concat$chrom=="chrM",1] = "chr23"
-  concat[concat$chrom=="chrX",1] = "chr24"
-  concat[concat$chrom=="chrY",1] = "chr25"
-  mychrs = unique(concat$chrom)
-  concat$chrom = as.numeric(factor(concat$chrom),levels=mychrs)
-  man = manhattan(ewas_manhattan_var,chr="chrom",bp="start",p="pval",snp = "probes",highlight = idx_probes, cex=sqrt(rois_var[i,]$n_probes),chrlabs = c(1:22,"M","X","Y"),suggestiveline = F)
-  print(man)
-}
-
-```
 
 ```{r}
+ewas_manhattan = ewas
+ewas_manhattan[ewas_manhattan$chrom=="chrM",1] = "chr23"
+ewas_manhattan[ewas_manhattan$chrom=="chrX",1] = "chr24"
+ewas_manhattan[ewas_manhattan$chrom=="chrY",1] = "chr25"
+mylabs = unique(ewas_manhattan$chrom)
+ewas_manhattan$chrom = as.numeric(factor(ewas_manhattan$chrom))
+ewas_manhattan$padj = p.adjust(ewas_manhattan$pval,method="BH")
 
-cowplot::plot_grid(graphiques, labels = "AUTO")
-df$facteur == factor(dfr$condition, levels =  c("n = 10", "n = 15", "n = 20", "n = 30", "n = 40", "n = 50", "n = 100", "n = 500", "α0 = 1", "α0 = 10",  "α0 = 100" , "α0 = 10,000"  , "ε = 0.05", "ε = 0.1",  "ε = 0.2",  "G = 1", "G = 2"))
-df$facteur = factor(df$facteur, levels =  c("ordre des facteurs"))
-```
-
-
-```{r}
 ewas_manhattan_var = ewas_var
 ewas_manhattan_var[ewas_manhattan_var$X.chrom=="chrM",1] = "chr23"
 ewas_manhattan_var[ewas_manhattan_var$X.chrom=="chrX",1] = "chr24"
 ewas_manhattan_var[ewas_manhattan_var$X.chrom=="chrY",1] = "chr25"
 mylabs_var = unique(ewas_manhattan_var$X.chrom)
 ewas_manhattan_var$chrom = as.numeric(factor(ewas_manhattan_var$X.chrom))
-
-
-layout(matrix(1:2,1),respect=T)
-manhattan(ewas_manhattan_var,chr="chrom",bp="start",p="pval",snp = "probes",suggestiveline = F,genomewideline = F,chrlabs=c(1:22,"M","X","Y"))
-abline(h=-log10(FDR(ewas_manhattan_var$pval)),col=4)
-manhattan(ewas_manhattan_var,chr="chrom",bp="start",p="padj_DC",snp = "probes",suggestiveline = F,genomewideline = F,chrlabs=c(1:22,"M","X","Y"))
-abline(h=-log10(0.05),col=2)
-abline(h=-log10(0.05),col=2)
+ewas_manhattan_var$padj = p.adjust(ewas_manhattan_var$pval,method="BH")
 
 layout(matrix(1:2,1),respect=T)
 manhattan(ewas_manhattan,"chrom","start","pval","probes",suggestiveline = F,genomewideline = F,chrlabs=c(1:22,"M","X","Y"))
 abline(h=-log10(FDR(ewas_manhattan$pval)),col=4)
 manhattan(ewas_manhattan,"chrom","start","padj","probes",suggestiveline = F,genomewideline = F,chrlabs=c(1:22,"M","X","Y"))
 abline(h=-log10(0.05),col=2)
-abline(h=-log10(0.05),col=2)
 
-ewas_manhattan$padj = p.adjust(ewas_manhattan$pval,method="BH")
-ewas_manhattan_var$padj = p.adjust(ewas_manhattan_var$pval,method="BH")
+layout(matrix(1:2,1),respect=T)
+manhattan(ewas_manhattan_var,chr="chrom",bp="start",p="pval",snp = "probes",suggestiveline = F,genomewideline = F,chrlabs=c(1:22,"M","X","Y"))
+abline(h=-log10(FDR(ewas_manhattan_var$pval)),col=4)
+manhattan(ewas_manhattan_var,chr="chrom",bp="start",p="padj_DC",snp = "probes",suggestiveline = F,genomewideline = F,chrlabs=c(1:22,"M","X","Y"))
+abline(h=-log10(0.05),col=2)
 
 
 ```
 
 ```{r}
+
+# Mann-Whitney test for mean (in progress)
 test = data.frame(chrom=character(),start=integer(),end=integer(),probes=character(),sd_C=double())
 rDMR = apply_func(new_regions,1,function(l){
   chr = l[[1]]
@@ -747,6 +683,8 @@ boxplot(ewas_test$sd_C, test$sd_C, las=2, border=c(2,4))
 ```
 
 ```{r}
+
+# Mann-Whitney test for var (in progress)
 test_var = data.frame(X.chrom=character(),start=integer(),end=integer(),probes=character())
 vrDMR = apply_func(rois_var,1,function(l){
   chr = l[[1]]
@@ -779,49 +717,6 @@ boxplot(ewas_test$sd_C, test$sd_C, las=2, border=c(2,4))
 #print(p7)
 ```
 
-```{r}
-for (i in 1:nrow(rois)){
-  chr = rois[i,1]
-  st = as.numeric(rois[i,2])
-  ed = as.numeric(rois[i,3])
-  r1 = subset(ewas,chrom == chr & start >= st & end <= ed)
-  idx_probes = r1$probes
-  df = r1
-  #df = melt(bed_ewas[rownames(r1),], id.vars=colnames(bed_ewas))
-  #df=df[,c("start", "probes","beta_C","beta_D","sd_C","sd_D",replicates)]
-  df= pivot_longer(df,cols=replicates, names_to="condition",values_to="meth_value")
-  df = pivot_longer(df, cols=c("beta_C", "beta_D"), names_to="mean", values_to = "mean_value")
-  df = pivot_longer(df, cols=c("sd_C", "sd_D"), names_to="sd", values_to = "sd_value")
-  df$cond=substr(df$mean, 6, 6)
-  df = df[order(df$cond),]
-  df = data.frame(df)
-  #print(df)
-  cd_C = df[substr(df[,colnames(df)=="condition"],1,1)=="C"&df$cond=="C"&df$mean=="beta_C"&df$sd=="sd_C",]
-  cd_D = df[substr(df[,colnames(df)=="condition"],1,1)=="D"&df$cond=="D"&df$mean=="beta_D"&df$sd=="sd_D",]
-  concat = rbind(cd_C,cd_D)
-  #par(mfrow=c(2,3))
-  #p1 = as.ggplot(function() plot(as.numeric(as.factor(substr(idx_sample,1, 1))), 1:length(idx_sample),xaxt="n",yaxt="n"))
-  #axis(1,c(1,2),levels(e$cond))
-  #p2 = as.ggplot(function() image(d[idx_probes,idx_sample], col=cols, breaks=breaks, xaxt="n", yaxt="n",ylab="Methylation value between \n C (bottom) and D (top)"))
-  #segments(-1,0.5,2,0.5,lwd=2)
-  #axis(1, (1:nrow(d[idx_probes,idx_sample]) - 1)/(nrow(d[idx_probes,idx_sample]) - 1), rownames(d[idx_probes,idx_sample]), las = 2)
-  #p3 = as.ggplot(function() plot_combp_res(rois[i,],ewas,combp_res_probes))
-  #p4 = as.ggplot(function()boxplot(meth_value~cond+probes,concat,las=2,border=c(2,4),ylim=c(0,1)))
-  #p1 = ggplot(concat, aes(x=start, y=mean_value, color=cond)) + geom_point() + geom_errorbar(aes(ymin=mean_value-sd_value, ymax=mean_value+sd_value))
-  #print(p1)
-  concat$cond = as.factor(concat$cond)
-  #p5 = as.ggplot(function()errbar(concat$start,concat$mean_value,concat$mean_value+concat$sd_value,concat$mean_value-concat$sd_value,col=c(2,4)[concat$cond],errbar.col=c(2,4)[concat$cond],xlab = "start",ylab = "meth_value"))
-  #cowplot::plot_grid(list(p1,p2,p3,p4,p5),labels="AUTO")
-  concat[concat$chrom=="chrM",1] = "chr23"
-  concat[concat$chrom=="chrX",1] = "chr24"
-  concat[concat$chrom=="chrY",1] = "chr25"
-  mychrs = unique(concat$chrom)
-  concat$chrom = as.numeric(factor(concat$chrom),levels=mychrs)
-  man = manhattan(ewas_manhattan,chr="chrom",bp="start",p="pval",snp = "probes",highlight = idx_probes, cex=rois[i,]$n_probes)
-  print(man)
-}
-
-```
 # Session Information
 
 ```{r results="verbatim"}
