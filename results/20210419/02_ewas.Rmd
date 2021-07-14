@@ -13,37 +13,14 @@ output:
 ```{r, echo=FALSE, eval=TRUE}
 knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
 knitr::opts_knit$set(root.dir = 'results/20210419/')
+library(epimedtools)
 ```
 
 ```{r loading_data}
 if (!exists("mreadRDS")) {
   mreadRDS = memoise::memoise(function(...) {print("reading..."); ret=readRDS(...); print("done."); return(ret)})
 }
-s = mreadRDS("../../data/study_hadaca_epic.rds")
-
-# for (n in  names(s)[-c(6)]) {
-# # for (n in  names(s)) {
-#   fn = paste0(n, ".rds")
-#   print(fn)
-#   # print("  writing")
-#   # saveRDS(s[[n]], fn)
-#   print("  reading")
-#   e = mreadRDS(fn)
-# }
-#
-# n = "foo"
-# fn = paste0(n, ".rds")
-# print(fn)
-# print("  writing")
-# saveRDS(n, fn)
-# print("  reading")
-# e = mreadRDS(fn)
-#
-#
-# saveRDS(s$exp_grp, "e.rds")
-# e = mreadRDS("e.rds")
-# saveRDS(s$data, "d.rds")
-# d = mreadRDS("d.rds")
+s = readRDS("../../data/study_hadaca_epic.rds")
 
 NAS = apply(is.na(s$data), 2, which)
 
@@ -54,11 +31,7 @@ d = na.omit(d)
 dim(d)
 sum(is.na(d))
 
-
-
-
 e = s$exp_grp
-e$cond = substr(s$exp_grp$cond, 1, 4)
 
 nb_probes = nrow(d)
 ```
@@ -66,6 +39,12 @@ nb_probes = nrow(d)
 # Design 
 
 ```{r exp_grp, echo=TRUE, results="verbatim"}
+table(e$cond)
+levels(e$cond)[levels(e$cond)=="DbKO_rep1"] = "A_dbko"
+levels(e$cond)[levels(e$cond)=="D1KO_rep3"] = "B_doko"
+levels(e$cond)[levels(e$cond)=="WTws_rep6"] = "C_serum"
+levels(e$cond)[levels(e$cond)=="WTwo_rep6"] = "D_woser"
+e$cond = factor(e$cond,levels=c("A_dbko","B_doko","C_serum","D_woser"))
 table(e$cond)
 ```
 [1] Nature des données:
@@ -110,17 +89,53 @@ hist(d[,idx_D], main="Condition D: HCT116 WT serum deprivation 24h")
 
 - **Comparaison entre les WT avec ou sans sérum (D vs C)**: la modification du milieu de culture n’a pas d’impact sur la distribution de la méthylation, on conserve l’aspect bimodal.
 
+## PCA (Principal Component Analysis)
+
+```{r}
+if (!exists("pca")) {
+  #d = s$data
+  #dim(data)
+  # filtering...
+  idx = apply(is.na(d), 1, any)
+  sum(idx)
+  d = d[!idx,]
+  idx = apply(d, 1, function (l){
+    length(unique(l)) == 1
+  })
+  sum(idx)
+  d = d[!idx,]
+  dim(d)
+  set.seed(1)
+  pca = prcomp(t(d[sample(1:nrow(d), 1000),]), scale=TRUE)  
+}
+  
+v = pca$sdev * pca$sdev
+p = v / sum(v) * 100
+layout(matrix(1:4,2, byrow=FALSE), respect=TRUE)
+barplot(p)
+i=3
+j=2
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+i=1
+j=3
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+i=1
+j=2
+plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), col=as.numeric(s$exp_grp[rownames(pca$x),]$cond), pch=16)
+text(pca$x[,i], pca$x[,j], rownames(pca$x))
+```
+
 # Univariate Analysis
 
 ## Student tests
 
 ```{r ewas_mean, echo=F, eval=TRUE, results="verbatim"}
-apply_func =  apply
-apply_func =  epimedtools::monitored_apply
 if (!file.exists("ewas_mean.rds")) {
   ewas_mean =  apply_func(d[1:nb_probes,] , 1, function(l) {  
     # print(l)
-    # l = d[1,]
+    #l = d[1,]
     
     data =  e[colnames(d),]
     data$meth =  l
@@ -132,14 +147,19 @@ if (!file.exists("ewas_mean.rds")) {
     fstat_BC =  summary(m_BC)$fstatistic
     fstat_DC =  summary(m_DC)$fstatistic
 
-    pval_AC =  1 - pf(fstat_AC[1], fstat_AC[2], fstat_AC[3]) # anova(m_AC)[1,5]
-    pval_BC =  1 - pf(fstat_BC[1], fstat_BC[2], fstat_BC[3]) # anova(m_BC)[1,5]
-    pval_DC =  1 - pf(fstat_DC[1], fstat_DC[2], fstat_DC[3]) # anova(m_DC)[1,5]
+    pval_AC =  1 - pf(fstat_AC[1], fstat_AC[2], fstat_AC[3])
+    pval_BC =  1 - pf(fstat_BC[1], fstat_BC[2], fstat_BC[3])
+    pval_DC =  1 - pf(fstat_DC[1], fstat_DC[2], fstat_DC[3])
 
     beta_AC =  m_AC$coef[[2]]
     beta_BC =  m_BC$coef[[2]]
-    beta_C = m_DC$coef[[2]]
+    beta_C = m_DC$coef[[1]]
     beta_D = m_DC$coef[[1]]+m_DC$coef[[2]]
+    beta_DC = m_DC$coef[[2]]
+    sd_A = sd(data[idx_A,]$meth)
+    sd_B = sd(data[idx_B,]$meth)
+    sd_C = sd(data[idx_C,]$meth)
+    sd_D = sd(data[idx_D,]$meth)
 
     ret <-  c(
       pval_AC = pval_AC,
@@ -147,8 +167,13 @@ if (!file.exists("ewas_mean.rds")) {
       pval_DC = pval_DC,
       beta_AC = beta_AC,
       beta_BC = beta_BC,
+      beta_DC = beta_DC,
       beta_C = beta_C,
       beta_D = beta_D,
+      sd_A = sd_A,
+      sd_B = sd_B,
+      sd_C = sd_C,
+      sd_D = sd_D,
       NULL
     )
     return(ret)
@@ -159,9 +184,11 @@ if (!file.exists("ewas_mean.rds")) {
   saveRDS(ewas_mean, "ewas_mean.rds")
 }
 
-ewas_mean = readRDS("ewas_mean.rds")
-print(rownames(ewas_mean)[which(ewas_mean$beta_AC == max(ewas_mean$beta_AC))])
-  
+ewas_mean = mreadRDS("ewas_mean.rds")
+
+# Testing with a set of temporary probes
+tmp_probes = c("cg21020221",  "cg06619462", "cg18748898")
+ewas_mean[tmp_probes,]
 ```
 
 
@@ -172,17 +199,16 @@ if (!file.exists("ewas_var.rds")) {
   ewas_var <- apply_func(d[1:nb_probes,] , 1, function(l) {  
     # print(l)
     # l = d[1,]
-  
+    
     vtest_AC = var.test(l[idx_A],l[idx_C])
     vtest_BC = var.test(l[idx_B],l[idx_C])
     vtest_DC = var.test(l[idx_D],l[idx_C])
-
     pval_AC = vtest_AC$p.value 
     pval_BC = vtest_BC$p.value 
-    pval_DC = vtest_DC$p.value 
-    beta_AC = log2(vtest_AC$estimate[[1]])
-    beta_BC = log2(vtest_BC$estimate[[1]])
-    beta_DC = log2(vtest_DC$estimate[[1]])
+    pval_DC = vtest_DC$p.value
+    beta_AC = vtest_AC$estimate[[1]]
+    beta_BC = vtest_BC$estimate[[1]]
+    beta_DC = vtest_DC$estimate[[1]]
 
     ret = c(
       pval_AC = pval_AC,
@@ -200,7 +226,7 @@ if (!file.exists("ewas_var.rds")) {
   head(ewas_var)
   saveRDS(ewas_var, "ewas_var.rds")
  }
- ewas_var = readRDS("ewas_var.rds")
+ ewas_var = mreadRDS("ewas_var.rds")
 ```
 
 
@@ -212,12 +238,12 @@ head(ewas_var)
 # FDR BH
 
 ```{r fdr_bh, echo=TRUE, eval=TRUE, results="verbatim"}
-ewas_mean$padj_AC = p.adjust(ewas_mean$pval_AC, method="BH")
-ewas_mean$padj_BC = p.adjust(ewas_mean$pval_BC, method="BH")
-ewas_mean$padj_DC = p.adjust(ewas_mean$pval_DC, method="BH")
-ewas_var$padj_AC = p.adjust(ewas_var$pval_AC, method="BH")
-ewas_var$padj_BC = p.adjust(ewas_var$pval_BC, method="BH")
-ewas_var$padj_DC = p.adjust(ewas_var$pval_DC, method="BH")
+ewas_mean$padj_AC = p.adjust(ewas_mean$pval_AC.value, method="BH")
+ewas_mean$padj_BC = p.adjust(ewas_mean$pval_BC.value, method="BH")
+ewas_mean$padj_DC = p.adjust(ewas_mean$pval_DC.value, method="BH")
+ewas_var$padj_AC = p.adjust(ewas_var$pval_AC.value, method="BH")
+ewas_var$padj_BC = p.adjust(ewas_var$pval_BC.value, method="BH")
+ewas_var$padj_DC = p.adjust(ewas_var$pval_DC.value, method="BH")
 ```
 
 
@@ -239,63 +265,54 @@ FDR = function (x, FDR=0.05) {
     }
 }
 
-layout(matrix(1:2,1), respect=TRUE)
-plot(-log10(ewas_mean$padj_AC), -log10(ewas_mean$pval_AC), pch = ".")
-abline(a=0, b=1)
-abline(v=-log10(0.05), col=2, lty=2)
+layout(1, respect=TRUE)
+plot(-log10(ewas_mean$padj_DC), -log10(ewas_mean$pval_DC.value), pch = ".", xlab = "adjusted p-values", ylab="raw p-values")
+abline(a=0, b=1,col=2,lwd=2,lty=1)
+abline(v=-log10(0.05), col=1, lwd=2,lty=2)
+abline(h= -log10(0.05), col=4, lwd=2,lty=5)
+abline(h= -log10(FDR(ewas_mean$pval_DC.value)), col=3, lwd=2,lty=2)
+legend("topright", legend=c("linear function","p-value threshold (raw)","p-value threshold (adjusted)","5% FDR threshold"), col = c(2,1,4,3), lwd=c(2,2,2,2), lty=c(1,2,5,2),cex=0.75)
 
-plot(-log10(ewas_mean$padj_AC), -log10(ewas_mean$pval_AC), xlim=c(0, 2), ylim=c(0, 2), pch = ".")
-abline(a=0, b=1)
-abline(v= -log10(0.05), col=2, lty=2)
-abline(h= -log10(0.05), col=4, lty=2)
-abline(h= -log10(FDR(ewas_mean$pval_AC)), col=3, lty=2)
-
-plot(-log10(ewas_mean$padj_DC), -log10(ewas_mean$pval_DC), pch = ".")
-abline(a=0, b=1)
-abline(v=-log10(0.05), col=2, lty=2)
-
-plot(-log10(ewas_mean$padj_DC), -log10(ewas_mean$pval_DC), xlim=c(0, 2), ylim=c(0, 2), pch = ".")
-abline(a=0, b=1)
-abline(v= -log10(0.05), col=2, lty=2)
-abline(h= -log10(0.05), col=4, lty=100)
-abline(h= -log10(FDR(ewas_mean$pval_DC)), col=5, lty=2)
-
-plot(-log10(ewas_mean$padj_BC), -log10(ewas_mean$pval_BC), pch = ".")
-abline(a=0, b=1)
-abline(v= -log10(0.05), col=2, lty=2)
-
-plot(-log10(ewas_mean$padj_BC), -log10(ewas_mean$pval_BC), xlim=c(0, 2), ylim=c(0, 2), pch = ".")
-abline(a=0, b=1)
-abline(v= -log10(0.05), col=2, lty=2)
-abline(h= -log10(0.05), col=4, lty=2)
-abline(h= -log10(FDR(ewas_mean$pval_BC)), col=3, lty=2)
-
-
-
-```
-
-```{r echo=T, eval=T}
-layout(matrix(c(1:3,1)), respect = TRUE)
-qqplot(-log10(ewas_mean$padj_AC), -log10(ewas_mean$pval_AC), pch=".")
-qqplot(-log10(ewas_mean$padj_BC), -log10(ewas_mean$pval_BC), pch=".")
-qqplot(-log10(ewas_mean$padj_DC), -log10(ewas_mean$pval_DC), pch=".")
 ```
 
 # Volcano Plot
 ```{r echo=T,eval=T,results="hold",label="Volcano plotting data"}
+
 layout(matrix(1:2,1), respect=TRUE)
-plot(ewas_mean$beta_AC, -log10(ewas_mean$pval_AC), xlab="beta", ylab="-log10(pval)", main="cond A vs. cond C, mean", pch = ".")
+plot(ewas_mean$beta_AC, -log10(ewas_mean$pval_AC.value), xlab="beta", ylab="-log10(pval)", main="cond A vs. cond C, mean", pch = ".")
+abline(h=-log10(FDR(ewas_mean$pval_AC.value)),col=4)
 plot(ewas_mean$beta_AC, -log10(ewas_mean$padj_AC), xlab="beta", ylab="-log10(padj)", main="cond A vs. cond C, mean", pch = ".")
-plot(ewas_mean$beta_BC, -log10(ewas_mean$pval_BC), xlab="beta", ylab="-log10(pval)", main="cond B vs. cond C, mean", pch = ".")
-plot(ewas_mean$beta_BC, -log10(ewas_mean$padj_BC), xlab="beta", ylab="-log10(padj)", main="cond B vs. cond C, mean", pch = ".")
-plot(ewas_mean$beta_DC, -log10(ewas_mean$pval_DC), xlab="beta", ylab="-log10(pval)", main="cond D vs. cond C, mean", pch = ".")
-plot(ewas_mean$beta_DC, -log10(ewas_mean$padj_DC), xlab="beta", ylab="-log10(padj)", main="cond D vs. cond C, mean", pch = ".")
-plot( ewas_var$beta_AC, -log10( ewas_var$pval_AC), xlab="beta", ylab="-log10(pval)", main="cond A vs. cond C, _var", pch = ".")
+abline(h=-log10(0.05),col=2)
+
+layout(matrix(1:2,1), respect=TRUE)
+plot( ewas_var$beta_AC, -log10( ewas_var$pval_AC.value), xlab="beta", ylab="-log10(pval)", main="cond A vs. cond C, _var", pch = ".")
+abline(h=-log10(FDR(ewas_mean$pval_AC.value)),col=4)
 plot( ewas_var$beta_AC, -log10( ewas_var$padj_AC), xlab="beta", ylab="-log10(padj)", main="cond A vs. cond C, _var", pch = ".")
-plot( ewas_var$beta_BC, -log10( ewas_var$pval_BC), xlab="beta", ylab="-log10(pval)", main="cond B vs. cond C, _var", pch = ".")
+abline(h=-log10(0.05),col=2)
+
+layout(matrix(1:2,1), respect=TRUE)
+plot(ewas_mean$beta_BC, -log10(ewas_mean$pval_BC.value), xlab="beta", ylab="-log10(pval)", main="cond B vs. cond C, mean", pch = ".")
+abline(h=-log10(FDR(ewas_mean$pval_BC.value)),col=4)
+plot(ewas_mean$beta_BC, -log10(ewas_mean$padj_BC), xlab="beta", ylab="-log10(padj)", main="cond B vs. cond C, mean", pch = ".")
+abline(h=-log10(0.05),col=2)
+
+layout(matrix(1:2,1), respect=TRUE)
+plot( ewas_var$beta_BC, -log10( ewas_var$pval_BC.value), xlab="beta", ylab="-log10(pval)", main="cond B vs. cond C, _var", pch = ".")
+abline(h=-log10(FDR(ewas_var$pval_DC.value)),col=4)
 plot( ewas_var$beta_BC, -log10( ewas_var$padj_BC), xlab="beta", ylab="-log10(padj)", main="cond B vs. cond C, _var", pch = ".")
-plot( ewas_var$beta_DC, -log10( ewas_var$pval_DC), xlab="beta", ylab="-log10(pval)", main="cond D vs. cond C, _var", pch = ".")
+abline(h=-log10(0.05),col=2)
+
+layout(matrix(1:2,1), respect=TRUE)
+plot( ewas_mean$beta_DC, -log10( ewas_mean$pval_DC.value), xlab="beta", ylab="-log10(pval)", main="cond D vs. cond C, mean", pch = ".")
+abline(h=-log10(FDR(ewas_mean$pval_DC.value)),col=4)
+plot( ewas_mean$beta_DC, -log10( ewas_mean$padj_DC), xlab="beta", ylab="-log10(padj)", main="cond D vs. cond C, mean", pch = ".")
+abline(h=-log10(0.05),col=2)
+
+layout(matrix(1:2,1), respect=TRUE)
+plot( ewas_var$beta_DC, -log10( ewas_var$pval_DC.value), xlab="beta", ylab="-log10(pval)", main="cond D vs. cond C, _var", pch = ".")
+abline(h=-log10(FDR(ewas_var$pval)),col=4)
 plot( ewas_var$beta_DC, -log10( ewas_var$padj_DC), xlab="beta", ylab="-log10(padj)", main="cond D vs. cond C, _var", pch = ".")
+abline(h=-log10(0.05),col=2)
 
 
 ```
@@ -341,16 +358,17 @@ posDC <- data.frame(stats[stats[,6] > 0, 6])
 ```{r}
 layout(matrix(1:2,1), respect=TRUE)
 
-plot(ewas_mean$beta_DC, ewas_var$beta_DC, pch = ".")
-plot(-log10(ewas_mean$pval_DC), -log10(ewas_var$pval_DC), pch = ".")
+plot(ewas_mean$beta_AC, ewas_var$beta_AC, pch = ".")
+plot(-log10(ewas_mean$pval_AC.value), -log10(ewas_var$pval_AC.value), pch = ".")
 
 plot(ewas_mean$beta_BC, ewas_var$beta_BC, pch = ".")
-plot(-log10(ewas_mean$pval_BC), -log10(ewas_var$pval_BC), pch = ".")
+plot(-log10(ewas_mean$pval_BC.value), -log10(ewas_var$pval_BC.value), pch = ".")
 
-plot(ewas_mean$beta_AC, ewas_var$beta_AC, pch = ".")
-plot(-log10(ewas_mean$pval_AC), -log10(ewas_var$pval_AC), pch = ".")
+plot(ewas_mean$beta_DC, ewas_var$beta_DC, pch = ".")
+plot(-log10(ewas_mean$pval_DC.value), -log10(ewas_var$pval_DC.value), pch = ".")
 
 ```
+
 ```{r echo=T, eval=T, results="verbatim"}
 layout(matrix(1:3,1), respect=TRUE)
 
@@ -362,13 +380,13 @@ plot(density(ewas_var$beta_AC), xlab="beta", main="Density ewas_var$beta_AC")
 plot(density(ewas_var$beta_BC), xlab="beta", main="Density ewas_var$beta_BC")
 plot(density(ewas_var$beta_DC), xlab="beta", main="Density ewas_var$beta_DC")
 
-plot(density(-log10(ewas_mean$pval_AC)), xlab="-log10(pvalue)", main="Density ewas_mean$pval_AC")
-plot(density(-log10(ewas_mean$pval_BC)), xlab="-log10(pvalue)", main="Density ewas_mean$pval_BC")
-plot(density(-log10(ewas_mean$pval_DC)), xlab="-log10(pvalue)", main="Density ewas_mean$pval_DC")
+plot(density(-log10(ewas_mean$pval_AC.value)), xlab="-log10(pvalue)", main="Density ewas_mean$pval_AC")
+plot(density(-log10(ewas_mean$pval_BC.value)), xlab="-log10(pvalue)", main="Density ewas_mean$pval_BC")
+plot(density(-log10(ewas_mean$pval_DC.value)), xlab="-log10(pvalue)", main="Density ewas_mean$pval_DC")
 
-plot(density(-log10(ewas_var$pval_AC)), xlab="-log10(pvalue)", main="Density ewas_var$pval_AC")
-plot(density(-log10(ewas_var$pval_BC)), xlab="-log10(pvalue)", main="Density ewas_var$pval_BC")
-plot(density(-log10(ewas_var$pval_DC)), xlab="-log10(pvalue)", main="Density ewas_var$pval_DC")
+plot(density(-log10(ewas_var$pval_AC.value)), xlab="-log10(pvalue)", main="Density ewas_var$pval_AC")
+plot(density(-log10(ewas_var$pval_BC.value)), xlab="-log10(pvalue)", main="Density ewas_var$pval_BC")
+plot(density(-log10(ewas_var$pval_DC.value)), xlab="-log10(pvalue)", main="Density ewas_var$pval_DC")
 
 ```
 
